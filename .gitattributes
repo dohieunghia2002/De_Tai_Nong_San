@@ -1,0 +1,2 @@
+# Giữ nguyên từng byte của mọi file (không đổi ký tự xuống dòng CRLF/LF)
+* -text

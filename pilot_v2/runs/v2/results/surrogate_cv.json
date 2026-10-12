@@ -1,0 +1,19 @@
+{
+  "n_rows": 4320,
+  "n_batches": 120,
+  "cv_r2_dyield": 0.8568899391386863,
+  "cv_mae_dyield_kg": 46.9560653762264,
+  "cv_r2_contrast_vs_recipe": 0.7131248951725329,
+  "cv_mae_contrast_kg": 40.1076376271765,
+  "cv_sign_agreement_contrast": 0.6647222222222222,
+  "cv_r2_vmax": 0.9891989934756024,
+  "cv_mae_vmax_L": 323.79964343804926,
+  "share_windows_over_volume_limit": 0.010648148148148148,
+  "static_action": {
+    "Fs": 1.6,
+    "Foil": 1.6,
+    "Fg": 1.2,
+    "Fpaa": 0.8
+  },
+  "static_action_mean_pred_gain_kg": 248.8806779246957
+}

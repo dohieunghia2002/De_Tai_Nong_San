@@ -1,0 +1,7 @@
+# File do Python tự sinh khi chạy, không cần lưu
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Bài báo PDF có bản quyền: để trong thư mục riêng, không đưa lên GitHub
+*.pdf

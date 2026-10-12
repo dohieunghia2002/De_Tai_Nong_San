@@ -1,0 +1,322 @@
+{
+  "surrogate_cv": {
+    "n_rows": 4320,
+    "n_batches": 120,
+    "cv_r2_dyield": 0.8568899391386863,
+    "cv_mae_dyield_kg": 46.9560653762264,
+    "cv_r2_contrast_vs_recipe": 0.7131248951725329,
+    "cv_mae_contrast_kg": 40.1076376271765,
+    "cv_sign_agreement_contrast": 0.6647222222222222,
+    "cv_r2_vmax": 0.9891989934756024,
+    "cv_mae_vmax_L": 323.79964343804926,
+    "share_windows_over_volume_limit": 0.010648148148148148,
+    "static_action": {
+      "Fs": 1.6,
+      "Foil": 1.6,
+      "Fg": 1.2,
+      "Fpaa": 0.8
+    },
+    "static_action_mean_pred_gain_kg": 248.8806779246957
+  },
+  "policies": {
+    "recipe": {
+      "mean_yield_kg": 2922.610347842601,
+      "sd_yield_kg": 770.6913880626084,
+      "batches_over_volume_limit": 1,
+      "mean_vmax_L": 93816.81334861445,
+      "mean_sugar_L": 17615.0,
+      "mean_oil_L": 6054.0,
+      "yield_per_1000L_sugar": 165.91600044522292
+    },
+    "fix_so12": {
+      "mean_yield_kg": 3699.1141130844167,
+      "sd_yield_kg": 567.0996419332404,
+      "batches_over_volume_limit": 8,
+      "mean_vmax_L": 98319.38074187888,
+      "mean_sugar_L": 19887.0,
+      "mean_oil_L": 6670.400000000001,
+      "yield_per_1000L_sugar": 186.00664318823434,
+      "vs_recipe": {
+        "mean_diff_kg": 776.5037652418147,
+        "ci": [
+          595.9430600249497,
+          964.6172731453967
+        ],
+        "mean_diff_pct": 31.749563583426244,
+        "n_better": 24,
+        "wilcoxon_p": 1.1920928955078125e-07
+      }
+    },
+    "fix_static": {
+      "mean_yield_kg": 3769.058949984828,
+      "sd_yield_kg": 423.57107522552036,
+      "batches_over_volume_limit": 23,
+      "mean_vmax_L": 107743.19681313405,
+      "mean_sugar_L": 24431.0,
+      "mean_oil_L": 7903.200000000002,
+      "yield_per_1000L_sugar": 154.27362572079846,
+      "vs_recipe": {
+        "mean_diff_kg": 846.4486021422262,
+        "ci": [
+          431.14090355070186,
+          1231.056034025805
+        ],
+        "mean_diff_pct": 42.59633477315122,
+        "n_better": 21,
+        "wilcoxon_p": 0.00010764598846435547
+      }
+    },
+    "dss": {
+      "mean_yield_kg": 4051.2573990417563,
+      "sd_yield_kg": 531.782941615326,
+      "batches_over_volume_limit": 24,
+      "mean_vmax_L": 104054.29241225596,
+      "mean_sugar_L": 22145.0,
+      "mean_oil_L": 7042.2333333333345,
+      "yield_per_1000L_sugar": 182.3921167974237,
+      "vs_recipe": {
+        "mean_diff_kg": 1128.6470511991552,
+        "ci": [
+          895.2619768084668,
+          1386.1952687147239
+        ],
+        "mean_diff_pct": 48.13215459234021,
+        "n_better": 24,
+        "wilcoxon_p": 1.1920928955078125e-07
+      }
+    }
+  },
+  "comparisons": {
+    "dss_vs_best_fixed": {
+      "best_fixed": "fix_static",
+      "mean_diff_kg": 282.19844905692906,
+      "ci": [
+        13.75035677106751,
+        605.5800467835079
+      ],
+      "mean_diff_pct": 10.445420095960912,
+      "n_better": 15,
+      "wilcoxon_p": 0.03948163986206055
+    }
+  },
+  "recommendations": {
+    "n_decisions": 144,
+    "n_changed": 110,
+    "distinct_actions": 28,
+    "true_gain_positive_rate": 0.9545454545454546,
+    "pred_vs_true_gain_pearson": 0.5464615224471007,
+    "pred_vs_true_gain_mae_kg": 83.18489576446781,
+    "mean_pred_gain_kg": 193.3599073908948,
+    "mean_true_gain_kg": 213.59451220371946,
+    "windows_over_volume_limit": 44,
+    "by_decision_time": {
+      "96": {
+        "pred_gain": 202.2656161556691,
+        "true_gain": 181.65063636679096
+      },
+      "120": {
+        "pred_gain": 265.1551866157994,
+        "true_gain": 332.8612463662055
+      },
+      "144": {
+        "pred_gain": 245.20379815042145,
+        "true_gain": 211.34111294059724
+      },
+      "168": {
+        "pred_gain": 133.5469916373401,
+        "true_gain": 173.78523907084264
+      },
+      "192": {
+        "pred_gain": 111.25246483804541,
+        "true_gain": 173.04402362652922
+      },
+      "216": {
+        "pred_gain": 140.22277494840554,
+        "true_gain": 156.68653629362964
+      }
+    },
+    "most_common_actions": [
+      {
+        "Fs": 1.6,
+        "Foil": 1.6,
+        "Fg": 1.2,
+        "Fpaa": 0.8,
+        "count": 16
+      },
+      {
+        "Fs": 1.4,
+        "Foil": 1.2,
+        "Fg": 1.2,
+        "Fpaa": 0.8,
+        "count": 14
+      },
+      {
+        "Fs": 1.6,
+        "Foil": 1.4,
+        "Fg": 1.2,
+        "Fpaa": 0.8,
+        "count": 11
+      },
+      {
+        "Fs": 1.4,
+        "Foil": 1.4,
+        "Fg": 1.2,
+        "Fpaa": 0.8,
+        "count": 8
+      },
+      {
+        "Fs": 1.6,
+        "Foil": 1.4,
+        "Fg": 1.2,
+        "Fpaa": 1.6,
+        "count": 8
+      }
+    ],
+    "ground_truth": {
+      "mean_attribution_kg": {
+        "Fs": 53.82374961200187,
+        "Foil": 28.512097446707106,
+        "Fg": 131.48295557573655,
+        "Fpaa": -0.22429043072609886
+      },
+      "top_driver_counts": {
+        "Fs": 60,
+        "Foil": 5,
+        "Fg": 43,
+        "Fpaa": 2
+      }
+    }
+  },
+  "explanation_fidelity": {
+    "m1": {
+      "top1_agreement": 0.4818181818181818,
+      "top1_ci": [
+        0.34951456310679613,
+        0.6016967901604919
+      ],
+      "spearman_mean": 0.36416544445224686,
+      "spearman_ci": [
+        0.2747625200787533,
+        0.44966629171335903
+      ],
+      "cosine_mean": 0.6520977785519937,
+      "cosine_ci": [
+        0.616140815203718,
+        0.6826331980532205
+      ],
+      "mae_per_component_kg": 63.82614295453548,
+      "mae_ci": [
+        53.79021493671409,
+        73.41560408972792
+      ],
+      "mean_sum_kg": 188.9729542234074,
+      "sign_agreement": 0.8674242424242424,
+      "top_driver_counts": {
+        "Fs": 12,
+        "Foil": 0,
+        "Fg": 93,
+        "Fpaa": 5
+      },
+      "mean_attribution_kg": {
+        "Fs": 65.6868778515247,
+        "Foil": 19.462671352845554,
+        "Fg": 85.65590931968948,
+        "Fpaa": 18.167495699347647
+      }
+    },
+    "m2": {
+      "top1_agreement": 0.5818181818181818,
+      "top1_ci": [
+        0.4482758620689655,
+        0.7222222222222222
+      ],
+      "spearman_mean": 0.5215872424476496,
+      "spearman_ci": [
+        0.43987791117963493,
+        0.6029810325290542
+      ],
+      "cosine_mean": 0.6814891324138375,
+      "cosine_ci": [
+        0.6053700189640489,
+        0.7596314076018678
+      ],
+      "mae_per_component_kg": 58.80959528850451,
+      "mae_ci": [
+        44.711321833558486,
+        71.94557489825134
+      ],
+      "mean_sum_kg": 132.7104950917542,
+      "sign_agreement": 0.8780303030303029,
+      "top_driver_counts": {
+        "Fs": 103,
+        "Foil": 7,
+        "Fg": 0,
+        "Fpaa": 0
+      },
+      "mean_attribution_kg": {
+        "Fs": 76.95540612508935,
+        "Foil": 18.81808723180259,
+        "Fg": 33.801766957267056,
+        "Fpaa": 3.135234777595221
+      }
+    },
+    "m3": {
+      "top1_agreement": 0.5545454545454546,
+      "top1_ci": [
+        0.4237211788059245,
+        0.691606757728253
+      ],
+      "spearman_mean": 0.4054545454545454,
+      "spearman_ci": [
+        0.24561403508771928,
+        0.5843320505772399
+      ],
+      "cosine_mean": 0.5835213706922917,
+      "cosine_ci": [
+        0.4688628650860081,
+        0.7092781948302819
+      ],
+      "mae_per_component_kg": 63.2006791947171,
+      "mae_ci": [
+        45.88747037973941,
+        79.85719998821614
+      ],
+      "mean_sum_kg": 193.35990739089476,
+      "sign_agreement": 0.8462121212121212,
+      "top_driver_counts": {
+        "Fs": 101,
+        "Foil": 7,
+        "Fg": 0,
+        "Fpaa": 2
+      },
+      "mean_attribution_kg": {
+        "Fs": 128.32855968167053,
+        "Foil": 34.6061358206211,
+        "Fg": 16.385602316920128,
+        "Fpaa": 14.039609571682993
+      }
+    }
+  },
+  "method_names": {
+    "m1": "TreeSHAP (standard)",
+    "m2": "Delta-TreeSHAP (naive contrast)",
+    "m3": "Contrastive Shapley (proposed)"
+  },
+  "policy_names": {
+    "recipe": "Recipe",
+    "fix_so12": "Fixed rule: sugar & oil x1.2",
+    "fix_static": "Best fixed action (model-chosen)",
+    "dss": "DSS (adaptive)"
+  },
+  "volume_limit_L": 100000,
+  "min_effect_kg_for_sign": 5.0,
+  "decision_times_h": [
+    96,
+    120,
+    144,
+    168,
+    192,
+    216
+  ],
+  "n_test_batches": 24
+}
