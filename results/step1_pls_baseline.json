@@ -1,0 +1,85 @@
+{
+  "preprocess": {
+    "deriv": 2,
+    "window": 17,
+    "polyorder": 2,
+    "snv": false,
+    "wl_min": 684,
+    "wl_max": 990
+  },
+  "n_variables": 103,
+  "n_components": 11,
+  "train_sets": [
+    "Cal",
+    "Tuning"
+  ],
+  "n_train_spectra": 10243,
+  "counts": {
+    "Cal": {
+      "spectra": 7413,
+      "fruit": 2866
+    },
+    "Tuning": {
+      "spectra": 2830,
+      "fruit": 1086
+    },
+    "Val Ext": {
+      "spectra": 1448,
+      "fruit": 725
+    },
+    "Val Ext 2": {
+      "spectra": 320,
+      "fruit": 160
+    }
+  },
+  "test": {
+    "Val Ext": {
+      "n": 1448,
+      "rmsep": 1.0142397108521546,
+      "bias": -0.06502274556696996,
+      "sep": 1.0125029474455778,
+      "r2": 0.8555504154266564,
+      "r2_pearson": 0.8586484591737921,
+      "benchmarks": [
+        {
+          "source": "Anderson et al. 2020, Table 6 (PLSR - all, 11 LV)",
+          "rmsep": 1.01,
+          "bias": -0.07,
+          "must_match": true,
+          "rmsep_diff": 0.004239710852154577,
+          "bias_diff": 0.004977254433030043,
+          "rmsep_match": true
+        }
+      ]
+    },
+    "Val Ext 2": {
+      "n": 320,
+      "rmsep": 1.8305136268442317,
+      "bias": -1.4751706666814695,
+      "sep": 1.0855109100208373,
+      "r2": -0.2243560019433326,
+      "r2_pearson": 0.5798897779914194,
+      "benchmarks": [
+        {
+          "source": "pilot_dss.py (same method)",
+          "rmsep": 1.83,
+          "bias": -1.48,
+          "must_match": true,
+          "rmsep_diff": 0.0005136268442316183,
+          "bias_diff": 0.0048293333185305265,
+          "rmsep_match": true
+        },
+        {
+          "source": "Walsh et al. 2024, best PLS (different tuning)",
+          "rmsep": 1.87,
+          "bias": 1.56,
+          "must_match": false,
+          "rmsep_diff": -0.03948637315576842,
+          "bias_diff": -3.0351706666814695,
+          "rmsep_match": false
+        }
+      ]
+    }
+  },
+  "all_required_benchmarks_match": true
+}

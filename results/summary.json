@@ -1,0 +1,20 @@
+{
+  "step1": {
+    "description": "PLS 11 LV on Cal+Tuning, SG d2 w17 p2 on full spectrum, 684-990 nm; spectrum-level metrics",
+    "Val Ext": {
+      "n": 1448,
+      "rmsep": 1.0142397108521546,
+      "bias": -0.06502274556696996,
+      "sep": 1.0125029474455778,
+      "r2": 0.8555504154266564
+    },
+    "Val Ext 2": {
+      "n": 320,
+      "rmsep": 1.8305136268442317,
+      "bias": -1.4751706666814695,
+      "sep": 1.0855109100208373,
+      "r2": -0.2243560019433326
+    },
+    "all_required_benchmarks_match": true
+  }
+}

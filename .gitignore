@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
+# Môi trường ảo Python (tạo lại bằng requirements.txt, xem README.md)
+.venv/
+
 # Bài báo và luận văn PDF: để trong docs/ trên máy, không đưa lên GitHub
 *.pdf
 

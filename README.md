@@ -14,8 +14,30 @@ Hệ thống nhận phổ NIR của một quả, dự đoán DMC, rồi đưa ra
 
 - Ngày 18/10/2026: chuyển từ đề tài lên men penicillin sang đề tài này. Mã và kết quả cũ đã xóa; nếu cần, xem lịch sử git (commit `14a3857` trở về trước).
 - Đã có pilot `scripts/pilot_dss.py` (PLS 11 thành phần, khoảng conformal, hiệu chỉnh lô, cờ bất thường phổ). Các mốc mà pilot đạt được ghi trong mục 5 của đặc tả.
-- Mã chính trong `src/` **chưa viết**. Repo chưa có kết quả nào do mã mới tạo ra.
-- Bước tiếp theo: Bước 1 của đặc tả, tái hiện baseline PLS (mốc RMSEP mùa vụ 4 = 1,01 %FW).
+- **Bước 1 (tái hiện baseline PLS) đã xong ngày 18/10/2026**, khớp các mốc. Số liệu trong `results/summary.json`, mục `step1`:
+
+| Tập kiểm thử | Số phổ | RMSEP (%FW) | Bias, dự đoán − thật (%FW) | Mốc |
+|---|---|---|---|---|
+| Mùa vụ 4 (`Val Ext`) | 1.448 | 1,014 | −0,065 | Anderson 2020: 1,01 và −0,07 |
+| Mùa vụ 5 (`Val Ext 2`) | 320 | 1,831 | −1,475 | Pilot: 1,83 và −1,48 |
+
+- Bước tiếp theo: Bước 2 của đặc tả, tầng quyết định với PLS.
+
+## Cách chạy
+
+Tạo môi trường ảo một lần (Windows, Python 3.10), từ thư mục gốc repo:
+
+```
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+```
+
+Sau đó chạy bằng Python của venv:
+
+```
+.venv\Scripts\python -m pytest                 # kiểm tra số phổ, số quả và RMSEP mùa vụ 4 (vài giây)
+.venv\Scripts\python -m src.step1_baseline     # Bước 1: in so sánh với các mốc, ghi kết quả vào results/
+```
 
 ## Cấu trúc thư mục
 
@@ -25,7 +47,13 @@ Hệ thống nhận phổ NIR của một quả, dự đoán DMC, rồi đưa ra
 | `docs/PROMPT_ClaudeCode_DSS_XAI_xoai.md` | Đặc tả đề tài: dữ liệu, kiến trúc M1–M5, các bước thực nghiệm, mốc kiểm tra |
 | `docs/*.pdf` | Bài báo gốc Anderson 2020 (`1-s2.0-S0925521420301629-main.pdf`), bài Walsh 2024 và luận văn của Walsh (chỉ có trên máy, không commit) |
 | `scripts/pilot_dss.py` | Pilot ban đầu, dùng làm tham chiếu |
-| `src/`, `tests/`, `notebooks/`, `results/` | Sẽ tạo từ Bước 1, theo mục 6 của đặc tả |
+| `src/data.py` | Đọc dữ liệu, tạo mã quả, kiểm tra số phổ và số quả của từng tập |
+| `src/preprocess.py` | M1: tiền xử lý phổ (Savitzky–Golay trên toàn phổ, cắt 684–990 nm; tùy chọn SNV) |
+| `src/models_pls.py` | M2: mô hình PLS và các chỉ số RMSEP, bias, SEP, R² |
+| `src/step1_baseline.py` | Chạy Bước 1 và ghi kết quả |
+| `tests/` | Test cho dữ liệu, tiền xử lý và mốc RMSEP |
+| `results/` | Kết quả: `summary.json` (số liệu tổng hợp), `step1_*.json/csv` |
+| `notebooks/` | Notebook Colab cho ANN và 1D-CNN (sẽ tạo ở Bước 3) |
 
 ## Dữ liệu
 
