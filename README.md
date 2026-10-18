@@ -21,7 +21,19 @@ Hệ thống nhận phổ NIR của một quả, dự đoán DMC, rồi đưa ra
 | Mùa vụ 4 (`Val Ext`) | 1.448 | 1,014 | −0,065 | Anderson 2020: 1,01 và −0,07 |
 | Mùa vụ 5 (`Val Ext 2`) | 320 | 1,831 | −1,475 | Pilot: 1,83 và −1,48 |
 
-- Bước tiếp theo: Bước 2 của đặc tả, tầng quyết định với PLS.
+- **Bước 2 (tầng quyết định với PLS) đã xong ngày 18/10/2026.** Kết quả tái hiện pilot, chỉ lệch 1 quả do khác cách tính ngưỡng conformal (xem `results/step2_decision.json`). Số liệu đầy đủ cho T = 14, 15, 16 %FW trong `results/summary.json`, mục `step2`. Kết quả theo quả, tại T = 15 %FW, khoảng 90% có nửa độ rộng q = 1,255 %FW:
+
+| | Mùa vụ 4 (725 quả) | Mùa vụ 5 (160 quả) |
+|---|---|---|
+| Không defer: độ đúng | 93,0% | 61,3% |
+| Độ phủ thực tế của khoảng 90% | 76,4% | 18,8% |
+| Defer theo khoảng conformal: tự quyết / đúng trên quả tự quyết | 71,9% / 99,6% | 46,9% / 72,0% |
+| Hiệu chỉnh lô k = 5 + defer: tự quyết / đúng / báo "đủ chín" sai | 71,1% / 99,7% / 0,2% | 53,1% / 95,1% / 4,9% |
+| Hiệu chỉnh lô k = 5: độ phủ khoảng 90% | 91,3% | 84,9% |
+
+  Các tỉ lệ có hiệu chỉnh lô là trung bình gộp của 30 lần rút ngẫu nhiên. Độ lệch chuẩn giữa các lần lặp nằm trong `results/step2_decision_metrics.csv`. Ví dụ, mùa vụ 5 với k = 5 có tỉ lệ tự quyết 53,1% ± 6,0%.
+- Chưa làm: chọn ngưỡng defer tối ưu theo chi phí (mô-đun M4). Phần này cần các giá trị chi phí có nguồn trích dẫn.
+- Bước tiếp theo: Bước 3 của đặc tả, notebook Colab cho ANN và 1D-CNN.
 
 ## Cách chạy
 
@@ -35,8 +47,9 @@ python -m venv .venv
 Sau đó chạy bằng Python của venv:
 
 ```
-.venv\Scripts\python -m pytest                 # kiểm tra số phổ, số quả và RMSEP mùa vụ 4 (vài giây)
+.venv\Scripts\python -m pytest                 # kiểm tra dữ liệu, các mốc của Bước 1 và Bước 2 (vài giây)
 .venv\Scripts\python -m src.step1_baseline     # Bước 1: in so sánh với các mốc, ghi kết quả vào results/
+.venv\Scripts\python -m src.step2_decision     # Bước 2: tầng quyết định, so sánh với pilot, ghi kết quả vào results/
 ```
 
 ## Cấu trúc thư mục
@@ -50,9 +63,11 @@ Sau đó chạy bằng Python của venv:
 | `src/data.py` | Đọc dữ liệu, tạo mã quả, kiểm tra số phổ và số quả của từng tập |
 | `src/preprocess.py` | M1: tiền xử lý phổ (Savitzky–Golay trên toàn phổ, cắt 684–990 nm; tùy chọn SNV) |
 | `src/models_pls.py` | M2: mô hình PLS và các chỉ số RMSEP, bias, SEP, R² |
-| `src/step1_baseline.py` | Chạy Bước 1 và ghi kết quả |
-| `tests/` | Test cho dữ liệu, tiền xử lý và mốc RMSEP |
-| `results/` | Kết quả: `summary.json` (số liệu tổng hợp), `step1_*.json/csv` |
+| `src/uncertainty.py` | M3: khoảng conformal, hiệu chỉnh độ lệch theo lô, điểm bất thường phổ (Q-residual, Hotelling T²) |
+| `src/decision.py` | M4: quyết định đủ chín / chưa chín / chưa quyết và các chỉ số ở mức quyết định |
+| `src/step1_baseline.py`, `src/step2_decision.py` | Chạy Bước 1, Bước 2 và ghi kết quả |
+| `tests/` | Test cho dữ liệu, tiền xử lý, mô hình, các mô-đun M3 và M4, và các mốc của Bước 1, Bước 2 |
+| `results/` | Kết quả: `summary.json` (số liệu tổng hợp), `step1_*`, `step2_*` |
 | `notebooks/` | Notebook Colab cho ANN và 1D-CNN (sẽ tạo ở Bước 3) |
 
 ## Dữ liệu

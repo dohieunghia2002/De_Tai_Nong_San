@@ -72,3 +72,11 @@ def load_data(path=DATA_PATH, validate=True):
 
 def set_masks(df):
     return {s: (df['Set'] == s).to_numpy() for s in SETS}
+
+
+def fruit_table(df, pred):
+    """One row per fruit: reference DM (y) and the mean prediction (p) over the fruit's duplicate spectra."""
+    return (df.assign(pred=pred)
+              .groupby('fruit')
+              .agg(Set=('Set', 'first'), Pop=('Pop', 'first'), Cultivar=('Cultivar', 'first'), Type=('Type', 'first'),
+                   y=(TARGET, 'first'), p=('pred', 'mean'), n_spectra=('pred', 'size')))

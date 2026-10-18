@@ -1,0 +1,116 @@
+{
+  "config": {
+    "n_components": 11,
+    "train_set": "Cal",
+    "calibration_set": "Tuning",
+    "alpha": 0.1,
+    "thresholds": [
+      14.0,
+      15.0,
+      16.0
+    ],
+    "k_reference_fruit": [
+      5,
+      10
+    ],
+    "n_rep": 30,
+    "seed": 0,
+    "ood_limit": "95th percentile of Cal spectra"
+  },
+  "half_width": 1.2554608291104845,
+  "n_tuning_fruit": 1086,
+  "ood_spectra_flagged": {
+    "Val Ext": {
+      "q_residual": 0.20994475138121546,
+      "hotelling_t2": 0.09185082872928177
+    },
+    "Val Ext 2": {
+      "q_residual": 0.240625,
+      "hotelling_t2": 0.01875
+    }
+  },
+  "population_bias": {
+    "Val Ext": {
+      "95": 0.03256517135320362,
+      "96": -0.3531364688779516,
+      "97": 0.4761168868630071,
+      "98": -1.2916277638647597,
+      "99": 0.21212631468346294,
+      "100": -0.7550476985504543,
+      "101": -0.32015645862614805,
+      "102": -0.5319285988460544,
+      "103": -0.952394588780107,
+      "104": 0.7571835350920478,
+      "105": -0.3120774599156152,
+      "106": 0.018724991051777405,
+      "107": 1.11875171429003,
+      "108": 1.2276982136551802,
+      "109": -1.5014638602428674,
+      "110": 0.5734570610964991,
+      "111": 0.3613280754571744,
+      "112": -0.43526513474132467
+    },
+    "Val Ext 2": {
+      "128": -2.179326325816058,
+      "129": -1.5957920048238001
+    }
+  },
+  "pilot_comparison": [
+    {
+      "item": "half-width q",
+      "ours": "1.26",
+      "pilot": "1.26",
+      "match": true
+    },
+    {
+      "item": "Val Ext, spectra flagged by Q-residual",
+      "ours": "21%",
+      "pilot": "21%",
+      "match": true
+    },
+    {
+      "item": "Val Ext 2, spectra flagged by Q-residual",
+      "ours": "24%",
+      "pilot": "24%",
+      "match": true
+    },
+    {
+      "item": "Val Ext, none, T=15",
+      "ours": "93.0% 3.9% 76% 72% 99.6% 0.2%",
+      "pilot": "93.0% 3.9% 76% 72% 99.6% 0.2%",
+      "match": true
+    },
+    {
+      "item": "Val Ext, k=5, T=15",
+      "ours": "94.9% 2.4% 91% 71% 99.7% 0.2%",
+      "pilot": "94.9% 2.4% 91% 71% 99.7% 0.2%",
+      "match": true
+    },
+    {
+      "item": "Val Ext, k=10, T=15",
+      "ours": "95.1% 2.1% 93% 71% 99.8% 0.1%",
+      "pilot": "95.1% 2.1% 93% 71% 99.8% 0.1%",
+      "match": true
+    },
+    {
+      "item": "Val Ext 2, none, T=15",
+      "ours": "61.3% 0.0% 19% 47% 72.0% 0.0%",
+      "pilot": "61.3% 0.0% 19% 46% 71.6% 0.0%",
+      "match": false,
+      "explained": "one fruit (pop 129, true DMC 17.2, |p - 15| = 1.2557) lies between our q = 1.2555 (standard rank) and the pilot q = 1.2558 (interpolated): decided ready here (correct), deferred in the pilot"
+    },
+    {
+      "item": "Val Ext 2, k=5, T=15",
+      "ours": "82.8% 14.3% 85% 53% 95.1% 4.9%",
+      "pilot": "82.8% 14.3% 85% 53% 95.1% 4.9%",
+      "match": true
+    },
+    {
+      "item": "Val Ext 2, k=10, T=15",
+      "ours": "83.8% 13.1% 86% 51% 95.9% 4.1%",
+      "pilot": "83.8% 13.1% 86% 51% 95.9% 4.1%",
+      "match": true
+    }
+  ],
+  "pilot_reproduced": true
+}
