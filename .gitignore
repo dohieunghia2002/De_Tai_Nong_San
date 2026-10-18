@@ -3,5 +3,8 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
-# Bài báo PDF có bản quyền: để trong thư mục riêng, không đưa lên GitHub
+# Bài báo và luận văn PDF: để trong docs/ trên máy, không đưa lên GitHub
 *.pdf
+
+# Dữ liệu gốc (35 MB, tải từ Mendeley Data, xem README.md): không đưa lên GitHub
+data/*.csv

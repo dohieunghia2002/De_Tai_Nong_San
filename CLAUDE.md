@@ -6,35 +6,27 @@ Hướng dẫn cho Claude Code khi làm việc với repo này. Người dùng c
 
 - Đề tài do giáo sư giao: *"Nghiên cứu mô hình hỗ trợ ra quyết định điều hành sản xuất theo thời gian thực tích hợp AI giải thích được (XAI-driven DSS) trong chuỗi chế biến nông sản."*
 - Ngày 12/10/2026, người làm ban đầu bàn giao dự án cho một đồng nghiệp. Người đang làm việc với Claude là **người nhận bàn giao**, có thể chưa nắm hết chi tiết, nên giải thích rõ khi cần.
-- Đọc `README.md` trước: tình trạng hiện tại, kết quả v4, các việc còn mở, cấu trúc thư mục. Chi tiết phương pháp và 6 lỗi đã sửa trong PenSimPy nằm trong `pilot/README.md`.
-- Ngoài repo còn thư mục riêng `De_Tai_Nong_San_FILE_RIENG_TU` (không có trên GitHub): 6 bài báo PDF tham khảo và `lich_su_trao_doi.md` (toàn bộ trao đổi trước đây, khoảng 150 KB, gồm yêu cầu của giáo sư và phần trả lời 5 câu hỏi về đề tài). Khi cần, hỏi người dùng đường dẫn tới thư mục này; chỉ đọc phần cần thiết.
+- Ngày 18/10/2026, đề tài chuyển từ mô phỏng lên men penicillin (IndPenSim) sang **hỗ trợ ra quyết định thu hoạch xoài từ phổ NIR**. Mã và kết quả cũ đã xóa khỏi repo; nếu cần xem lại, lấy từ lịch sử git (commit `14a3857` trở về trước).
+- **Đặc tả đầy đủ của đề tài mới nằm trong `docs/PROMPT_ClaudeCode_DSS_XAI_xoai.md`. Đọc file này trước khi viết code:** dữ liệu, kiến trúc M1–M5, các bước thực nghiệm, mốc số liệu cần tái hiện, cấu trúc repo mong muốn.
+- `README.md` ghi tình trạng hiện tại và cấu trúc thư mục.
 
 ## Quy tắc bắt buộc
 
-- **Dữ liệu:** giáo sư chỉ chấp nhận bộ dữ liệu công khai đã được bài báo uy tín công bố hoặc sử dụng. Không tự thu thập; không dùng dữ liệu chỉ có trên Kaggle, dữ liệu tổng hợp hay preprint không có bài báo gốc. Khi đề xuất dữ liệu, ghi bài báo gốc và tạp chí, và nêu rõ nếu dữ liệu thuộc loại không được chấp nhận.
-- **Tính toán nặng:** không tự chạy mô phỏng, sinh dữ liệu hay huấn luyện trên máy người dùng. Mặc định đưa notebook hoặc script để chạy trên Google Colab (GPU T4). Chỉ chạy cục bộ các kiểm tra nhanh (vài giây), và mô tả trước khi chạy. Không tự làm chuỗi bước lớn ngoài yêu cầu. Lý do: người làm trước từng phản đối khi Claude chạy 120 mẻ mô phỏng trên laptop mà không hỏi.
-- **Ngôn ngữ:** mọi tin nhắn hiển thị cho người dùng viết bằng tiếng Việt, kể cả cập nhật ngắn giữa các bước. Văn bản gửi giáo sư viết bằng tiếng Việt, dùng **"Hệ thống hỗ trợ ra quyết định"** (viết đầy đủ, không rút gọn thành "Hệ hỗ trợ").
-- **Repo công khai:** không commit bài báo PDF (bản quyền, `.gitignore` đã chặn), thông tin cá nhân hay khóa API.
+- **Dữ liệu:** giáo sư chỉ chấp nhận bộ dữ liệu công khai đã được bài báo uy tín công bố hoặc sử dụng. Không tự thu thập, không tự sinh dữ liệu; không dùng dữ liệu chỉ có trên Kaggle, dữ liệu tổng hợp hay preprint không có bài báo gốc. Khi đề xuất dữ liệu, ghi bài báo gốc và tạp chí, và nêu rõ nếu dữ liệu thuộc loại không được chấp nhận. Bộ dữ liệu hiện dùng (Anderson et al. 2020, *Postharvest Biology and Technology*) đạt yêu cầu này.
+- **Không bịa số liệu:** mọi con số trong báo cáo phải lấy từ output thực tế (`results/summary.json`). Chưa chạy thì ghi "chưa có kết quả".
+- **Tính toán nặng:** không tự huấn luyện mạng nơ-ron (ANN, 1D-CNN) trên máy người dùng; viết notebook Google Colab (GPU T4). Chỉ chạy cục bộ các kiểm tra nhanh (vài giây), và mô tả trước khi chạy. Làm từng bước nhỏ; sau mỗi bước in kết quả kiểm tra (số dòng, số quả, sai số so với mốc) và dừng lại nếu lệch mốc. Không tự làm chuỗi bước lớn ngoài yêu cầu. Lý do: người làm trước từng phản đối khi Claude chạy mô phỏng dài trên laptop mà không hỏi.
+- **Ngôn ngữ:** mọi tin nhắn hiển thị cho người dùng viết bằng tiếng Việt, kể cả cập nhật ngắn giữa các bước. Code, tên biến, comment viết bằng tiếng Anh. Văn bản gửi giáo sư viết bằng tiếng Việt, dùng **"Hệ thống hỗ trợ ra quyết định"** (viết đầy đủ, không rút gọn thành "Hệ hỗ trợ").
+- **Repo công khai:** không commit file PDF, file dữ liệu gốc `data/*.csv` (`.gitignore` đã chặn cả hai), thông tin cá nhân hay khóa API.
 
-## Mã nguồn và cách chạy
+## Dữ liệu và mã nguồn
 
-- `pilot/` là bản đang dùng (v4). `pilot_v2/` là bản v2 chạy CPU; giữ nguyên vì `validate_gpu.py` so sánh với `pilot_v2/runs/v2/`.
-- `jaxsim.py` (mô phỏng GPU bằng JAX) phải tái hiện đúng từng bước bản CPU (`sim.py`). Sau khi sửa bộ mô phỏng, chạy `validate_gpu.py` và chỉ dùng kết quả khi nó in "KHỚP".
-- Không thay `pilot/pensimpy/` bằng bản PenSimPy trên PyPI: bản trong repo đã sửa lỗi.
-- **Quy trình một lần thực nghiệm mới (vN):**
-  1. Đóng gói mã thành `pilot_colab_vN.zip`, bên trong là thư mục `pilot_vN/`; tạo notebook `chay_tren_colab_vN.ipynb` theo mẫu bản v4 và đặt `PILOT_EXP = 'vN'`. Phải dùng tên mới: notebook bỏ qua bước giải nén nếu thư mục `pilot_vN/` đã có trên Drive.
-  2. Người dùng upload zip và notebook vào `MyDrive/De_Tai_Nong_San/` (cùng chỗ với `pilot_v2/`), chạy trên Colab.
-  3. Ô cuối notebook tạo `ket_qua_pilot_vN.zip`. Người dùng tải về, giải nén vào `Ket_qua_vN/` trong repo, rồi nhờ Claude phân tích.
-- Số liệu tổng hợp của mỗi lần chạy nằm trong `runs/vN/results/summary.json`; dùng file này khi viết báo cáo, không ước lượng số liệu.
+- Dữ liệu: `data/MangoDMC_NIR_Data_v3.csv` (12.011 phổ × 315 cột). Chỉ dùng file v3, không dùng v4 ở giai đoạn này. Giữ nguyên phân chia có sẵn trong cột `Set`, **không chia ngẫu nhiên**.
+- Mỗi quả được quét 2–2,6 lần và file không có mã quả. Tạo mã quả bằng `groupby(['Set','Pop','Type','Cultivar','DM'])`. RMSEP tính theo phổ (như bài gốc); quyết định đưa ra theo quả (trung bình dự đoán các phổ của quả).
+- `scripts/pilot_dss.py` là pilot ban đầu (PLS và tầng quyết định), dùng làm tham chiếu. Mã chính viết trong `src/` theo cấu trúc ở mục 6 của đặc tả.
+- Cố định random seed. Lưu mọi kết quả ra CSV/JSON trong `results/`, kèm `results/summary.json`; dùng file này khi viết báo cáo, không ước lượng số liệu.
+- Không tự gán ý nghĩa hóa học cho bước sóng nếu không có nguồn trích dẫn.
 - `.gitattributes` đặt `* -text` để giữ nguyên từng byte của file dữ liệu và mô hình.
 
-## Tính mới của đề tài (khảo sát ngày 02/10/2026)
+## Đóng góp của đề tài
 
-Các công trình gần nhất trên IndPenSim:
-- Mlinarič & Glavan, ERK 2025, kèm luận văn Đại học Ljubljana: DSS khuyến nghị hành động mỗi 24 giờ, không có XAI.
-- Li, Qiu & You, *CES* 2024: bộ điều khiển học tăng cường, chỉ có phân tích KernelSHAP tổng thể.
-- Luận văn ICESI 2025 và bài MLOps soft sensor, *C&CE* 2025 (cùng nhóm INRAE Toulouse): cảm biến mềm LSTM có SHAP, LIME.
-- Multi-scale TCN, *Systems & Control Transactions* 2026: SHAP cho cửa sổ cảnh báo; nêu "khép vòng tới can thiệp" là hướng tương lai.
-- Liu & Lou, *ISA Transactions* 2024: chẩn đoán lỗi bằng phản thực tế trên PenSim V2.
-
-Khoảng trống đề tài nhắm tới: giải thích đối chiếu (Shapley so với công thức vận hành) cho từng khuyến nghị, và **kiểm chứng độ trung thực của lời giải thích bằng cách chạy lại bộ mô phỏng IndPenSim**. Dữ liệu e-nose thịt bò (Wijaya 2018) dùng để kiểm chứng trên dữ liệu thực phẩm thật.
+Không nằm ở việc dự đoán DMC chính xác hơn (bài toán đã bão hòa, RMSEP 0,77–1,01 %FW), mà ở **tầng quyết định**: biết khi nào "chưa quyết" dựa trên độ bất định đã hiệu chỉnh; xử lý lệch mùa vụ bằng hiệu chỉnh độ lệch theo lô; giải thích từng quyết định và **kiểm chứng độ trung thực của lời giải thích**; đánh giá bằng chỉ số ở mức quyết định. Hướng mới chưa có khảo sát tài liệu về tính mới; cần làm trước khi khẳng định tính mới với giáo sư.
