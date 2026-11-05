@@ -9,11 +9,9 @@ __pycache__/
 # Bài báo và luận văn PDF: để trong docs/ trên máy, không đưa lên GitHub
 *.pdf
 
-# Dữ liệu gốc (35 MB, tải từ Mendeley Data, xem README.md): không đưa lên GitHub
-data/*.csv
-
-# Dữ liệu WeedsGalore (337 MB, tải từ GFZ) và gói kết quả tải về từ Colab: không đưa lên GitHub
-data/weedsgalore/
+# Dữ liệu WeedsGalore (337 MB, tải từ GFZ, xem README.md), ảnh xem trước và gói kết quả tải về từ Colab:
+# không đưa lên GitHub
+data/
 ket_qua_*.zip
 # Xác suất dự đoán của thí nghiệm thử (khoảng 50 MB, tạo lại được bằng notebook)
 results/weeds_pilot*/probs_*.npz
