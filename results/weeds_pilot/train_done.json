@@ -1,0 +1,1 @@
+{"reason": "early stopping: no val improvement for 30 epochs", "best_val_miou": 71.6921799560072, "epochs_run": 45}

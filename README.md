@@ -33,7 +33,18 @@ Hệ thống nhận phổ NIR của một quả, dự đoán DMC, rồi đưa ra
 
   Các tỉ lệ có hiệu chỉnh lô là trung bình gộp của 30 lần rút ngẫu nhiên. Độ lệch chuẩn giữa các lần lặp nằm trong `results/step2_decision_metrics.csv`. Ví dụ, mùa vụ 5 với k = 5 có tỉ lệ tự quyết 53,1% ± 6,0%.
 - Chưa làm: chọn ngưỡng defer tối ưu theo chi phí (mô-đun M4). Phần này cần các giá trị chi phí có nguồn trích dẫn.
-- Bước tiếp theo: Bước 3 của đặc tả, notebook Colab cho ANN và 1D-CNN.
+- **Bước 3 (ANN và 1D-CNN): mã nguồn và notebook Colab đã sẵn sàng, chưa có kết quả.** Có 6 cấu hình theo thiết lập của Walsh 2024, mỗi cấu hình 5 seed. Các mốc so sánh với mùa vụ 4:
+
+| Cấu hình | Mô tả | Mốc (Walsh 2024, cùng cách chia tập) |
+|---|---|---|
+| `ann_S_cal` | ANN, đạo hàm bậc 2; huấn luyện trên Cal, dừng sớm theo Tuning | 0,96 (A026, Bảng 5) |
+| `ann_S_all` | ANN, đạo hàm bậc 2; huấn luyện trên Cal + Tuning | 0,89 (A002, Bảng 1; Anderson 2020: 0,89) |
+| `cnn_TA_cal` | CNN, cắt rồi tăng cường phổ; Cal, dừng sớm theo Tuning | 0,82 (C028, Bảng 5) |
+| `cnn_AT_cal`, `cnn_AT_all` | CNN, tăng cường rồi cắt (cách tiền xử lý tốt nhất của Walsh) | Không có mốc cùng cách chia tập (Phụ lục A chỉ có trên web) |
+| `cnn_AT_calonly` | Như `cnn_AT_cal` nhưng không dùng Tuning dưới bất kỳ hình thức nào | Dùng cho tầng quyết định: Tuning hiệu chỉnh khoảng conformal |
+
+  Mốc 0,77 (mùa vụ 4) và 1,18 (mùa vụ 5) trong đặc tả là của mô hình C134. Mô hình này loại thêm 329 phổ ngoại lai theo Mishra & Passos 2021 và chia lại Cal/Tuning ngẫu nhiên theo phổ, nên **không so sánh trực tiếp được** với cách chia tập cố định của đề tài. Tiêu chí "tương đương": chênh lệch RMSEP trung bình không quá 0,05 %FW, khoảng 2 lần độ lệch chuẩn giữa các seed mà Walsh báo cáo.
+- Bước tiếp theo: chạy notebook Bước 3 trên Colab (xem mục Cách chạy).
 
 ## Cách chạy
 
@@ -50,7 +61,14 @@ Sau đó chạy bằng Python của venv:
 .venv\Scripts\python -m pytest                 # kiểm tra dữ liệu, các mốc của Bước 1 và Bước 2 (vài giây)
 .venv\Scripts\python -m src.step1_baseline     # Bước 1: in so sánh với các mốc, ghi kết quả vào results/
 .venv\Scripts\python -m src.step2_decision     # Bước 2: tầng quyết định, so sánh với pilot, ghi kết quả vào results/
+.venv\Scripts\python -m src.step3_analysis     # Bước 3: phân tích dự đoán ANN/CNN đã tải về từ Colab
 ```
+
+**Bước 3 chạy trên Google Colab** (GPU T4), không chạy trên laptop:
+
+1. Upload `MangoDMC_NIR_Data_v3.csv` vào `MyDrive/De_Tai_Nong_San/data/` và mở `notebooks/colab_cnn.ipynb` bằng Colab. Notebook tự lấy mã nguồn từ GitHub, nên mọi thay đổi trong `src/` phải được push trước khi chạy.
+2. Chọn *Runtime → Change runtime type → T4 GPU*, rồi chạy lần lượt từng ô. Nếu Colab ngắt kết nối, chạy lại từ đầu: các mô hình đã xong được bỏ qua.
+3. Tải `MyDrive/De_Tai_Nong_San/ket_qua_buoc3.zip` về và giải nén vào thư mục gốc repo. Thao tác này tạo `results/step3/` và cập nhật `results/summary.json`.
 
 ## Cấu trúc thư mục
 
@@ -61,14 +79,16 @@ Sau đó chạy bằng Python của venv:
 | `docs/*.pdf` | Bài báo gốc Anderson 2020 (`1-s2.0-S0925521420301629-main.pdf`), bài Walsh 2024 và luận văn của Walsh (chỉ có trên máy, không commit) |
 | `scripts/pilot_dss.py` | Pilot ban đầu, dùng làm tham chiếu |
 | `src/data.py` | Đọc dữ liệu, tạo mã quả, kiểm tra số phổ và số quả của từng tập |
-| `src/preprocess.py` | M1: tiền xử lý phổ (Savitzky–Golay trên toàn phổ, cắt 684–990 nm; tùy chọn SNV) |
+| `src/preprocess.py` | M1: tiền xử lý phổ (Savitzky–Golay trên toàn phổ, cắt 684–990 nm; tùy chọn SNV; tăng cường phổ 6 dạng cho CNN) |
 | `src/models_pls.py` | M2: mô hình PLS và các chỉ số RMSEP, bias, SEP, R² |
+| `src/models_nn.py` | M2: ANN và 1D-CNN (Keras, thiết lập theo code của Walsh 2024); chỉ chạy trên Colab |
 | `src/uncertainty.py` | M3: khoảng conformal, hiệu chỉnh độ lệch theo lô, điểm bất thường phổ (Q-residual, Hotelling T²) |
 | `src/decision.py` | M4: quyết định đủ chín / chưa chín / chưa quyết và các chỉ số ở mức quyết định |
 | `src/step1_baseline.py`, `src/step2_decision.py` | Chạy Bước 1, Bước 2 và ghi kết quả |
-| `tests/` | Test cho dữ liệu, tiền xử lý, mô hình, các mô-đun M3 và M4, và các mốc của Bước 1, Bước 2 |
-| `results/` | Kết quả: `summary.json` (số liệu tổng hợp), `step1_*`, `step2_*` |
-| `notebooks/` | Notebook Colab cho ANN và 1D-CNN (sẽ tạo ở Bước 3) |
+| `src/step3_train_nn.py`, `src/step3_analysis.py` | Bước 3: huấn luyện ANN/CNN (Colab), phân tích dự đoán (Colab hoặc máy cục bộ) |
+| `tests/` | Test cho dữ liệu, tiền xử lý, mô hình, các mô-đun M3 và M4, các mốc của Bước 1, Bước 2, và phần không cần TensorFlow của Bước 3 |
+| `results/` | Kết quả: `summary.json` (số liệu tổng hợp), `step1_*`, `step2_*`, `step3*` |
+| `notebooks/colab_cnn.ipynb` | Notebook Colab cho Bước 3 |
 
 ## Dữ liệu
 

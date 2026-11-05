@@ -33,3 +33,22 @@ def preprocess(X, wl, cfg=PreprocessConfig()):
         X = snv(X, keep)
     X = savgol_filter(X, cfg.window, cfg.polyorder, deriv=cfg.deriv, axis=1)
     return X[:, keep], wl[keep]
+
+
+AUGMENT_BLOCKS = ('raw', 'snv', 'sg1', 'sg2', 'snv_sg1', 'snv_sg2')
+
+
+def augment(X, wl, trim_first=False, wl_min=684, wl_max=990, window=13, polyorder=2):
+    """Six pretreatments of absorbance concatenated (Mishra & Passos 2021, as described by Walsh et al. 2024, 2.1):
+    nil, SNV, SG 1st and 2nd derivative (13 points, 2nd order), and SNV followed by each derivative -> 6 x 103 = 618.
+    trim_first=True trims to the window and then pretreats ('TA'); False pretreats the full spectrum and then trims
+    ('AT'). In 'AT', SNV statistics come from the full spectrum, as the paper describes."""
+    X = np.asarray(X, dtype=float)
+    wl = np.asarray(wl)
+    keep = (wl >= wl_min) & (wl <= wl_max)
+    if trim_first:
+        X = X[:, keep]
+        keep = np.ones(X.shape[1], dtype=bool)
+    S = snv(X)
+    blocks = [X, S] + [savgol_filter(B, window, polyorder, deriv=d, axis=1) for B in (X, S) for d in (1, 2)]
+    return np.hstack([b[:, keep] for b in blocks])

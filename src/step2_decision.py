@@ -53,20 +53,16 @@ SHORT = {'truly_ready': 'ready', 'accuracy_no_defer': 'acc', 'false_ready_no_def
          'decided': 'decided', 'accuracy_decided': 'acc_dec', 'false_ready_decided': 'false_rdy_dec'}
 
 
-def evaluate(df, quantile=conformal_quantile):
-    X, _ = preprocess(df[wavelength_columns(df)].to_numpy(), wavelengths(df))
-    y = df[TARGET].to_numpy()
-    masks = set_masks(df)
-    model = fit_pls(X[masks['Cal']], y[masks['Cal']], N_COMPONENTS)
-    fruit = fruit_table(df, predict(model, X))
+def evaluate_predictions(df, pred, quantile=conformal_quantile):
+    """Decision layer for per-spectrum predictions of any model trained without the Tuning set: the conformal
+    half-width is calibrated on Tuning fruit. Bias-correction draws are identical for every call (fixed seed)."""
+    fruit = fruit_table(df, pred)
     tuning = fruit[fruit['Set'] == 'Tuning']
     q = quantile(tuning['p'] - tuning['y'], ALPHA)
-    ood = SpectralOOD(model, X[masks['Cal']])
 
     rng = np.random.default_rng(SEED)
-    rows, ood_rates, pop_bias = [], {}, {}
+    rows, pop_bias = [], {}
     for s in TEST_SETS:
-        ood_rates[s] = {name: float(f.mean()) for name, f in ood.flags(X[masks[s]]).items()}
         sub = fruit[fruit['Set'] == s]
         pop_bias[s] = {int(pop): float((g['p'] - g['y']).mean()) for pop, g in sub.groupby('Pop')}
         tables = {'none': sub}
@@ -81,8 +77,19 @@ def evaluate(df, quantile=conformal_quantile):
                     per_rep = pd.DataFrame([decision_metrics(g['y'], g['p'], q, T) for _, g in t.groupby('rep')])
                     row.update({f'{m}_sd': float(per_rep[m].std(ddof=1)) for m in REP_SD_METRICS})
                 rows.append(row)
-    return {'half_width': q, 'n_tuning_fruit': int(len(tuning)), 'ood_spectra_flagged': ood_rates,
-            'population_bias': pop_bias, 'rows': rows}
+    return {'half_width': q, 'n_tuning_fruit': int(len(tuning)), 'population_bias': pop_bias, 'rows': rows}
+
+
+def evaluate(df, quantile=conformal_quantile):
+    X, _ = preprocess(df[wavelength_columns(df)].to_numpy(), wavelengths(df))
+    y = df[TARGET].to_numpy()
+    masks = set_masks(df)
+    model = fit_pls(X[masks['Cal']], y[masks['Cal']], N_COMPONENTS)
+    res = evaluate_predictions(df, predict(model, X), quantile)
+    ood = SpectralOOD(model, X[masks['Cal']])
+    res['ood_spectra_flagged'] = {s: {name: float(f.mean()) for name, f in ood.flags(X[masks[s]]).items()}
+                                  for s in TEST_SETS}
+    return res
 
 
 def pilot_comparison(res, known=PILOT_KNOWN_DIFF):

@@ -19,16 +19,6 @@
   },
   "half_width": 1.2554608291104845,
   "n_tuning_fruit": 1086,
-  "ood_spectra_flagged": {
-    "Val Ext": {
-      "q_residual": 0.20994475138121546,
-      "hotelling_t2": 0.09185082872928177
-    },
-    "Val Ext 2": {
-      "q_residual": 0.240625,
-      "hotelling_t2": 0.01875
-    }
-  },
   "population_bias": {
     "Val Ext": {
       "95": 0.03256517135320362,
@@ -53,6 +43,16 @@
     "Val Ext 2": {
       "128": -2.179326325816058,
       "129": -1.5957920048238001
+    }
+  },
+  "ood_spectra_flagged": {
+    "Val Ext": {
+      "q_residual": 0.20994475138121546,
+      "hotelling_t2": 0.09185082872928177
+    },
+    "Val Ext 2": {
+      "q_residual": 0.240625,
+      "hotelling_t2": 0.01875
     }
   },
   "pilot_comparison": [

@@ -4,3 +4,7 @@ pandas==2.3.3
 scipy==1.15.3
 scikit-learn==1.7.2
 pytest==9.1.1
+pillow==12.3.0  # image inspection (UAV dataset survey)
+# local CPU tests of src/weeds (Windows PyPI wheels are CPU builds; Colab brings its own GPU build)
+torch==2.6.0
+torchvision==0.21.0
