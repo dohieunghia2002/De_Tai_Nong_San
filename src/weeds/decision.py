@@ -126,27 +126,38 @@ def evaluate_policies(cal, test, tau, alpha, beta):
             for k, d in policies.items()]
 
 
-def evaluate_crossfit(cells, fold, tau, alpha, beta):
-    """Each fold is decided with thresholds calibrated on the other folds, then all cells are scored together, so
-    calibration cells never come from the evaluated locations. `fold` gives one fold label per row of `cells`.
-    lam_lo / lam_hi are tuples of the thresholds applied to each fold, in sorted fold order."""
+def crossfit_decisions(cells, fold, tau, alpha, beta):
+    """Decide each fold with thresholds calibrated on the other folds, so calibration cells never come from the
+    evaluated locations. `fold` gives one fold label per row of `cells`. Returns None when there is only one fold,
+    else (policies, per_row, per_fold): policies maps each policy to decisions aligned with the rows of `cells`;
+    per_row has the lam_lo / lam_hi applied to each row; per_fold lists policy_decisions' info in sorted fold order."""
     fold = np.asarray(fold)
-    if len(np.unique(fold)) < 2:
-        return []  # nothing left to calibrate on (e.g. a date whose tiles all fall in one fold)
-    parts = []
-    for k in np.unique(fold):
-        ev = cells[fold == k]
-        policies, info = policy_decisions(cells[fold != k], ev, tau, alpha, beta)
-        parts.append((ev, policies, info))
-    ev_all = pd.concat([p[0] for p in parts])
-    need = ev_all['w'].to_numpy() >= tau
-    w, crop = ev_all['w'].to_numpy(), ev_all['crop'].to_numpy()
-    info = {'lam_lo': tuple(p[2]['lam_lo'] for p in parts), 'lam_hi': tuple(p[2]['lam_hi'] for p in parts),
-            'n_cal_need': min(p[2]['n_cal_need'] for p in parts),
-            'n_cal_no_need': min(p[2]['n_cal_no_need'] for p in parts)}
-    rows = []
-    for name in parts[0][1]:
-        d = np.concatenate([p[1][name] for p in parts])
-        rows.append({'policy': name, 'tau': tau, 'alpha': alpha, 'beta': beta, **info,
-                     **decision_metrics(d, need, w, crop)})
-    return rows
+    folds = np.unique(fold)
+    if len(folds) < 2:
+        return None  # nothing left to calibrate on (e.g. a date whose tiles all fall in one fold)
+    policies, per_fold = {}, []
+    per_row = {'lam_lo': np.empty(len(cells)), 'lam_hi': np.empty(len(cells))}
+    for k in folds:
+        ev = fold == k
+        pol, info = policy_decisions(cells[~ev], cells[ev], tau, alpha, beta)
+        for name, d in pol.items():
+            policies.setdefault(name, np.empty(len(cells), dtype=int))[ev] = d
+        per_row['lam_lo'][ev], per_row['lam_hi'][ev] = info['lam_lo'], info['lam_hi']
+        per_fold.append(info)
+    return policies, per_row, per_fold
+
+
+def evaluate_crossfit(cells, fold, tau, alpha, beta):
+    """Every policy decided by crossfit_decisions, then all cells scored together. lam_lo / lam_hi are tuples of the
+    thresholds applied to each fold, in sorted fold order."""
+    res = crossfit_decisions(cells, fold, tau, alpha, beta)
+    if res is None:
+        return []
+    policies, _, per_fold = res
+    need = cells['w'].to_numpy() >= tau
+    w, crop = cells['w'].to_numpy(), cells['crop'].to_numpy()
+    info = {'lam_lo': tuple(i['lam_lo'] for i in per_fold), 'lam_hi': tuple(i['lam_hi'] for i in per_fold),
+            'n_cal_need': min(i['n_cal_need'] for i in per_fold),
+            'n_cal_no_need': min(i['n_cal_no_need'] for i in per_fold)}
+    return [{'policy': name, 'tau': tau, 'alpha': alpha, 'beta': beta, **info, **decision_metrics(d, need, w, crop)}
+            for name, d in policies.items()]

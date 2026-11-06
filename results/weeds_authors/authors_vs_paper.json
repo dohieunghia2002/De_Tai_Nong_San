@@ -1,0 +1,116 @@
+{
+ "dlv3p_msi_3": {
+  "bands": 5,
+  "classes": 3,
+  "paper": {
+   "miou": 82.9,
+   "background": 98.45,
+   "crop": 72.93,
+   "weed": 77.31
+  },
+  "fp32_test": {
+   "background": 98.4486068278215,
+   "crop": 72.93311801512165,
+   "weed": 77.30691823052692,
+   "miou": 82.89621435782335
+  },
+  "fp16_test": {
+   "background": 98.4486464464025,
+   "crop": 72.93446589955059,
+   "weed": 77.30890513994945,
+   "miou": 82.89733916196752
+  },
+  "fp32_test_minus_paper_miou": -0.0037856421766520043,
+  "fp16_test_minus_paper_miou": -0.0026608380324830705
+ },
+ "dlv3p_rgb_3": {
+  "bands": 3,
+  "classes": 3,
+  "paper": {
+   "miou": 79.33,
+   "background": 97.97,
+   "crop": 67.93,
+   "weed": 72.08
+  },
+  "fp32_test": {
+   "background": 97.9688768341023,
+   "crop": 67.92615350600417,
+   "weed": 72.08050254464082,
+   "miou": 79.3251776282491
+  },
+  "fp16_test": {
+   "background": 97.96870128875706,
+   "crop": 67.92781339818704,
+   "weed": 72.07717964275568,
+   "miou": 79.32456477656659
+  },
+  "fp32_test_minus_paper_miou": -0.004822371750904608,
+  "fp16_test_minus_paper_miou": -0.005435223433408964
+ },
+ "dlv3p_msi_6": {
+  "bands": 5,
+  "classes": 6,
+  "paper": {
+   "miou": 55.52,
+   "background": 98.37,
+   "maize": 73.03,
+   "amaranth": 76.17,
+   "barnyard_grass": 53.55,
+   "quickweed": 21.11,
+   "weed_other": 10.86
+  },
+  "fp32_test": {
+   "background": 98.37182836805935,
+   "maize": 73.02552382281617,
+   "amaranth": 76.17463388545451,
+   "barnyard_grass": 53.54808796255409,
+   "quickweed": 21.112037452703134,
+   "weed_other": 10.864314308396535,
+   "miou": 55.51607096666397
+  },
+  "fp16_test": {
+   "background": 98.37172216503045,
+   "maize": 73.02967913038927,
+   "amaranth": 76.17574581869658,
+   "barnyard_grass": 53.55282135813735,
+   "quickweed": 21.106977937403798,
+   "weed_other": 10.867141843732055,
+   "miou": 55.517348042231575
+  },
+  "fp32_test_minus_paper_miou": -0.003929033336035559,
+  "fp16_test_minus_paper_miou": -0.0026519577684283036
+ },
+ "dlv3p_rgb_6": {
+  "bands": 3,
+  "classes": 6,
+  "paper": {
+   "miou": 50.81,
+   "background": 97.94,
+   "maize": 71.46,
+   "amaranth": 74.32,
+   "barnyard_grass": 45.95,
+   "quickweed": 6.26,
+   "weed_other": 8.92
+  },
+  "fp32_test": {
+   "background": 97.94267551893161,
+   "maize": 71.45619625474704,
+   "amaranth": 74.32063608007266,
+   "barnyard_grass": 45.948528231508305,
+   "quickweed": 6.256008790001373,
+   "weed_other": 8.92039555426957,
+   "miou": 50.80740673825509
+  },
+  "fp16_test": {
+   "background": 97.94298472283543,
+   "maize": 71.46050247746273,
+   "amaranth": 74.32722229488455,
+   "barnyard_grass": 45.93945879834887,
+   "quickweed": 6.258148631029988,
+   "weed_other": 8.9206992221409,
+   "miou": 50.80816935778374
+  },
+  "fp32_test_minus_paper_miou": -0.0025932617449129225,
+  "fp16_test_minus_paper_miou": -0.0018306422162623903
+ }
+}

@@ -90,9 +90,12 @@ Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\pyth
 | `src/weeds/train.py` | Huấn luyện, chọn mô hình theo mIoU val, dừng sớm, chạy tiếp từ checkpoint, lưu xác suất dự đoán |
 | `src/weeds/decision.py` | Chia ô lưới, ngưỡng conformal theo lớp, các chính sách quyết định, chỉ số ở mức quyết định |
 | `src/weeds/analyze.py` | Chạy tầng quyết định cho mọi thiết lập và kết luận đạt/không đạt |
-| `scripts/make_weeds_notebook.py` | Sinh notebook Colab có nhúng sẵn mã nguồn `src/weeds/` |
+| `src/weeds/authors.py` | Đánh giá các mô hình công bố sẵn của tác giả bằng code của đề tài, so với Bảng 3–4 của bài báo |
+| `scripts/make_weeds_notebook.py` | Sinh 2 notebook Colab có nhúng sẵn mã nguồn `src/weeds/` |
 | `scripts/export_weeds_images.py` | Xuất ảnh xem trước của toàn bộ dữ liệu |
-| `notebooks/colab_weeds_pilot.ipynb` | Notebook Colab (sinh tự động, không sửa tay) |
+| `scripts/make_pipeline_figure.py` | Vẽ sơ đồ xử lý của hệ thống trên một ô ảnh test thật |
+| `notebooks/colab_weeds_pilot.ipynb` | Notebook Colab huấn luyện và chạy tầng quyết định (sinh tự động, không sửa tay) |
+| `notebooks/colab_weeds_authors.ipynb` | Notebook Colab đối sánh với bài báo bằng mô hình của tác giả (sinh tự động) |
 | `tests/` | Test đọc dữ liệu, huấn luyện trên ảnh nhỏ (CPU), tầng quyết định |
 | `results/weeds_pilot/`, `results/weeds_pilot_b8/` | Kết quả lần 1 (batch 2) và lần 2 (batch 8); file `probs_*.npz` không commit |
 | `docs/BAN_GIAO_SESSION.md` | Bàn giao giữa các phiên làm việc: tình trạng, kết quả, việc tiếp theo |
@@ -102,7 +105,7 @@ Các hướng đã bỏ vẫn còn trong lịch sử git: lên men penicillin (c
 
 ## Tài liệu tham khảo
 
-- Celikkan E. và cộng sự (2025). Bộ dữ liệu WeedsGalore: ảnh UAV đa phổ, đa thời điểm, phân vùng cây trồng và cỏ dại trên ruộng ngô. *IEEE/CVF Winter Conference on Applications of Computer Vision (WACV) 2025.* Bài gốc của bộ dữ liệu và kết quả phân vùng dùng để so sánh.
+- Celikkan E., Kunzmann T., Yeskaliyev Y., Itzerott S., Klein N., Herold M. (2025). WeedsGalore: A Multispectral and Multitemporal UAV-based Dataset for Crop and Weed Segmentation in Agricultural Maize Fields. *IEEE/CVF Winter Conference on Applications of Computer Vision (WACV) 2025*, tr. 4767–4777. Bản công khai: [CVF Open Access](https://openaccess.thecvf.com/content/WACV2025/html/Celikkan_WeedsGalore_A_Multispectral_and_Multitemporal_UAV-Based_Dataset_for_Crop_and_WACV_2025_paper.html). Bài gốc của bộ dữ liệu; kết quả phân vùng dùng để so sánh nằm ở Bảng 3.
 - Celikkan E., Saberioon M., Herold M., Klein N. (2023). Semantic Segmentation of Crops and Weeds with Probabilistic Modeling and Uncertainty Quantification. *ICCV 2023 Workshops.*
 - Melki P., Bombrun L., Diallo B., Dias J., Da Costa J.-P. (2025). Uncertainty Guarantees on Automated Precision Weeding using Conformal Prediction. Bản thảo arXiv:2501.07185. Nguồn của các chỉ số "sprayed ratio", "spray reduction", "spray surplus".
 

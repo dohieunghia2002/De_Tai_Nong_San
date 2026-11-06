@@ -26,8 +26,10 @@ CAL_TEST_2FOLD = 'test 2-fold by location'
 CAL_VAL = 'val (also used for model selection)'
 PRIMARY = {'cell_size': 200, 'tau': 0.01, 'policy': 'conformal_3way', 'scope': 'pre-herbicide pooled',
            'calibration': CAL_TEST_2FOLD}
-# Proposed pilot criteria (agreed before running; adjustable)
-CRITERIA = {'miou_min': PAPER_TEST_3CLASS_MSI['miou'] - 5, 'spray_reduction_min': 0.30, 'deferred_max': 0.30}
+# Proposed pilot criteria (agreed before running; adjustable). C1: test mIoU at most 5 points below the paper's value
+# for the same input; segmentation_metrics.json of the authors' checkpoints carries it as 'paper_test', our own runs
+# (5-band input) are compared with Table 3's MSI value.
+CRITERIA = {'miou_below_paper_max': 5.0, 'spray_reduction_min': 0.30, 'deferred_max': 0.30}
 
 
 def load_cells(data_dir, out_dir, split, cell):
@@ -82,9 +84,9 @@ def go_no_go(df, seg):
     r = pick(df, policy=PRIMARY['policy'], **key)
     oracle = pick(df, policy='oracle', **key)
     miou = seg['test']['miou']
+    miou_min = seg.get('paper_test', PAPER_TEST_3CLASS_MSI)['miou'] - CRITERIA['miou_below_paper_max']
     checks = {
-        'C1_test_miou': {'value': miou, 'required': f">= {CRITERIA['miou_min']:.2f}",
-                         'pass': bool(miou >= CRITERIA['miou_min'])},
+        'C1_test_miou': {'value': miou, 'required': f'>= {miou_min:.2f}', 'pass': bool(miou >= miou_min)},
         'C2_spray_reduction': {'value': r['spray_reduction'], 'required': f">= {CRITERIA['spray_reduction_min']}",
                                'pass': bool(r['spray_reduction'] >= CRITERIA['spray_reduction_min'])},
         'C3_deferred': {'value': r['deferred'], 'required': f"<= {CRITERIA['deferred_max']}",

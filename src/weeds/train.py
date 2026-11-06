@@ -18,7 +18,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-from src.weeds.data import CLASSES3, PAPER_TEST_3CLASS_MSI, load_npz, to_3class
+from src.weeds.data import CLASSES3, PAPER_TEST_3CLASS_MSI, SEMANTIC_CLASSES, load_npz, to_3class
 from src.weeds.model import DeepLabV3Plus
 
 
@@ -57,33 +57,40 @@ def confusion(pred, lab, n=3):
     return torch.bincount((lab * n + pred).flatten(), minlength=n * n).reshape(n, n)
 
 
-def iou_from_confusion(cm):
+def iou_from_confusion(cm, names=CLASSES3):
+    """Per-class IoU and mIoU in %. A class absent from both labels and predictions gets NaN and is left out of the
+    mIoU (torchmetrics, used by the authors, would count it as 0; every class occurs in the test split)."""
     cm = cm.double()
     tp = cm.diag()
     denom = cm.sum(0) + cm.sum(1) - tp
     iou = torch.where(denom > 0, tp / denom.clamp(min=1), torch.full_like(tp, float('nan')))
-    res = {c: float(100 * v) for c, v in zip(CLASSES3, iou)}
+    res = {c: float(100 * v) for c, v in zip(names, iou)}
     res['miou'] = float(100 * torch.nanmean(iou))
     return res
 
 
 @torch.no_grad()
-def evaluate(model, d, dev, batch=2, keep_probs=False, limit=None):
+def evaluate(model, d, dev, batch=2, keep_probs=False, limit=None, classes=3, bands=None, amp=True):
+    """classes: 3 (labels merged by to_3class) or 6 (semantic labels); bands: use only the first `bands` input bands
+    (3 = R, G, B); amp: float16 autocast on GPU as in training, False = float32 as in the authors' evaluate.py.
+    keep_probs (3 classes only) also returns P(crop), P(weed) per pixel in float16."""
+    if keep_probs and classes != 3:
+        raise ValueError('probabilities are kept for the 3-class setting only')
     model.eval()
     n = len(d['x']) if limit is None else min(limit, len(d['x']))
-    y3 = to_3class(d['y'][:n])
-    cm = torch.zeros(3, 3, dtype=torch.long, device=dev)
+    y = to_3class(d['y'][:n]) if classes == 3 else d['y'][:n]
+    cm = torch.zeros(classes, classes, dtype=torch.long, device=dev)
     probs = []
     for i in range(0, n, batch):
-        x = torch.from_numpy(d['x'][i:i + batch].astype(np.float32) / 65535.0).to(dev)
-        lab = torch.from_numpy(y3[i:i + batch].astype(np.int64)).to(dev)
-        with torch.autocast('cuda', dtype=torch.float16, enabled=dev.type == 'cuda'):
+        x = torch.from_numpy(d['x'][i:i + batch, :bands].astype(np.float32) / 65535.0).to(dev)
+        lab = torch.from_numpy(y[i:i + batch].astype(np.int64)).to(dev)
+        with torch.autocast('cuda', dtype=torch.float16, enabled=amp and dev.type == 'cuda'):
             logits = model(x)
         p = torch.softmax(logits.float(), dim=1)
-        cm += confusion(p.argmax(1), lab)
+        cm += confusion(p.argmax(1), lab, classes)
         if keep_probs:
             probs.append(p[:, 1:].half().cpu().numpy())  # P(crop), P(weed)
-    res = iou_from_confusion(cm.cpu())
+    res = iou_from_confusion(cm.cpu(), CLASSES3 if classes == 3 else SEMANTIC_CLASSES)
     res['confusion'] = cm.cpu().tolist()
     return (res, np.concatenate(probs)) if keep_probs else res
 

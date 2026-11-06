@@ -22,6 +22,11 @@
 4. **Hướng hiện tại: WeedsGalore.** Phân vùng cỏ dại trên ảnh UAV đa phổ, rồi **quyết định phun thuốc trừ cỏ theo ô lưới**.
    - **Chưa có xác nhận của thầy** về ba điểm: (a) cỏ dại có được tính là dịch hại không; (b) dữ liệu 1 ruộng, 1 mùa có đủ không; (c) có chấp nhận dữ liệu công bố ở hội nghị, hoặc bài báo dữ liệu kiểu *Data in Brief*, không.
    - Ngày 04–05/11, Claude đã soạn giúp người dùng các tin nhắn gửi thầy: phần trình bày đề tài, ba câu hỏi ở trên, và câu trả lời về input/output của dữ liệu (thầy hỏi). Claude cũng tạo gói ảnh xem trước của toàn bộ dữ liệu, vì thầy muốn xem ảnh trông như thế nào.
+   - **Ngày 05/11, thầy góp ý về input/output:** "output không phải là model quyết định; output phải xác định: kết quả phân lớp / vùng...". Vì vậy output được trình bày thành hai kết quả:
+     - output 1: kết quả phân vùng (segmentation) cho từng điểm ảnh;
+     - output 2: kết quả phân lớp (classification) cho từng ô 0,5 m: phun / không phun / chưa chắc.
+     Người dùng đã gửi thầy sơ đồ xử lý vẽ trên một ô ảnh test thật (`scripts/make_pipeline_figure.py`, ảnh lưu tại `data/weedsgalore/so_do_pipeline.png`) và bài báo gốc.
+   - **Yêu cầu của thầy (05/11):** "chạy thử rồi đối sánh với bài báo có dataset đó, xem thế nào; nếu ổn thì viết rồi hẹn vô gặp mình họp chốt".
 
 ## 2. Dữ liệu WeedsGalore (đã kiểm tra trực tiếp)
 
@@ -43,7 +48,9 @@
 - **Độ phủ cỏ (trung vị theo ô ảnh):** 0,2% / 0,9% / 4,9% / 34% theo 4 đợt bay.
 - **Ảnh xem trước:** `scripts/export_weeds_images.py` tạo ra `data/weedsgalore/anh_xem_truoc/`, gồm 4 ảnh tổng quan theo ngày, 156 ảnh chi tiết, README và LICENSE. Gói zip của thư mục này là `data/weedsgalore/anh_WeedsGalore_156_o_anh.zip` (76 MB).
 
-## 3. Tính mới (đã đọc kỹ ba bài gần nhất; PDF nằm trong `docs/`, riêng bài WACV 2025 chưa có PDF)
+## 3. Tính mới (đã đọc kỹ ba bài gần nhất; PDF nằm trong `docs/`)
+
+PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2025_WeedsGalore_WACV.pdf`. Đã đối chiếu: Bảng 3 ghi DeepLabv3+ ảnh 5 dải, 3 lớp, mIoU 82,90; phần cài đặt ghi batch 8, Adam lr 0,001.
 
 - **Celikkan và cộng sự 2025 (bài gốc WeedsGalore):** độ bất định bằng MC dropout, đo ECE. Chỉ **gợi ý** hệ thống "không phun khi độ bất định cao", không xây dựng thành quy tắc quyết định.
 - **Celikkan và cộng sự 2023 (ICCVW):** bản đồ độ bất định cho phân vùng cỏ và cây trồng. Không có quy tắc quyết định, không dùng conformal.
@@ -81,12 +88,30 @@
   - Tiêu chí đề xuất: mIoU test ≥ 77,90; giảm thuốc ≥ 30%; "chưa quyết" ≤ 30%.
   - Thiết lập chính: ô lưới 200 điểm ảnh (0,5 m), τ = 1%, α = β = 0,1, gộp 3 ngày trước khi phun.
 
+- `src/weeds/authors.py`: đánh giá mô hình công bố sẵn của tác giả bằng code của đề tài.
+  - Nguồn: `ckpts.zip` (887 MB) trên trang dữ liệu, chứa 6 mô hình. Module dùng 4 mô hình thường: ảnh 5 dải và RGB, bài toán 3 lớp và 6 lớp. Hai mô hình MC dropout (`dlv3p_do_*`) chưa dùng.
+  - Cách nạp: mạng của tác giả là DeepLabV3Plus theo VainF, chỉ khác tên tham số. Module đổi tên rồi nạp với `strict=True` và `weights_only=True`.
+  - Cách đánh giá: dùng **chính hàm `train.evaluate`** đã cho ra kết quả lần chạy 2 (hàm này đã được mở rộng cho 6 lớp, cho RGB và cho tùy chọn fp32/fp16). Mỗi mô hình được đánh giá hai lần:
+    - fp32, như `evaluate.py` của tác giả, để so với Bảng 3 và Bảng 4;
+    - fp16, như lần chạy 2, để tách riêng phần chênh lệch do fp16.
+  - Với mô hình 3 lớp, module lưu xác suất (từ lần đánh giá fp16) theo đúng định dạng của `train.py`, để chạy tiếp được `src.weeds.analyze`.
+  - Tiêu chí C1 trong `analyze.go_no_go` so mIoU với số của bài báo cho đúng loại đầu vào (khóa `paper_test`, ví dụ RGB là 79,33 − 5). Các lần chạy của đề tài vẫn so với 82,90 − 5 = 77,90.
+- Ngày 06/11 đã review lại code và sửa các lỗi review tìm ra; kết quả lần 2 tính lại bằng code mới khớp hoàn toàn với `decision_metrics.csv` và `go_no_go.json` đã lưu. Các thay đổi:
+  - `decision.crossfit_decisions` trả về quyết định cho từng ô; `evaluate_crossfit` và script vẽ sơ đồ cùng dùng hàm này.
+  - Lời giải thích trên sơ đồ đúng cho cả trường hợp ngưỡng không "bắt chéo", và cả khi ngưỡng là vô cực.
+  - Bước giải nén checkpoint kiểm tra kích thước file.
+- Đã đọc code của tác giả (github.com/GFZ/weedsgalore):
+  - lệnh mẫu huấn luyện 100 epoch cố định, batch 8, lưu checkpoint mỗi 100 vòng lặp, rồi chọn theo val;
+  - tính ở fp32, không dùng fp16;
+  - ảnh đầu vào chia 65535; RGB là 3 dải R, G, B đầu tiên.
+
 **Notebook và test:**
 - `notebooks/colab_weeds_pilot.ipynb` được sinh bởi `scripts/make_weeds_notebook.py`, nhúng sẵn các module. **Sửa `src/weeds` thì phải chạy lại script sinh notebook.**
   - Biến `BATCH` ở mục 1 quyết định batch, thư mục kết quả trên Drive (`run_dlv3p_msi_seed0_b<BATCH>`) và tên gói kết quả (`ket_qua_weeds_pilot_b<BATCH>.zip`, giải nén ra `results/weeds_pilot_b<BATCH>/`).
   - Nếu chạy lần mới với cùng batch (ví dụ seed khác), phải đổi tên thư mục và tên gói trong script, nếu không sẽ bị bỏ qua hoặc ghi đè.
+- `notebooks/colab_weeds_authors.ipynb` (sinh bởi cùng script): tải `ckpts.zip` lên Drive, đánh giá 4 mô hình của tác giả, chạy tầng quyết định trên 2 mô hình 3 lớp, rồi đóng gói thành `ket_qua_weeds_authors.zip`. Giải nén gói này vào `results/weeds_authors/`.
 - Trên runtime T4 chỉ cần bấm Run all; lỗi ở bước nào thì dừng ở bước đó.
-- Có 20 test trong `tests/test_weeds_*.py`. Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
+- Có 30 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
 
 ## 5. Kết quả thí nghiệm thử
 
@@ -123,12 +148,37 @@
 - **Ngưỡng bị "bắt chéo":** ở cả 2 phần hiệu chỉnh, λ_hi (khoảng 0,0076–0,0078) nhỏ hơn λ_lo (khoảng 0,0097–0,0109). Vì vậy 14 ô chưa quyết là các ô có điểm số sát ngưỡng 1%, nơi conformal loại được cả "cần phun" lẫn "không cần phun" (tập dự đoán rỗng). Khi viết phải diễn giải đúng điểm này.
 - **Plug-in đã gần bằng oracle.** Conformal không giảm thuốc nhiều hơn plug-in; nó đổi 14 ô phải kiểm tra lấy việc giảm bỏ sót từ 6 xuống 1 ô.
 
+**Đối sánh bằng mô hình công bố của tác giả** (`results/weeds_authors/`, chạy trên Colab ngày 06/11/2026):
+- **Code đánh giá của đề tài được kiểm chứng.** Cả 4 mô hình ra đúng số của bài báo, lệch dưới 0,005 điểm mIoU, và mọi IoU từng lớp khớp đến 2 chữ số thập phân. Số liệu (fp32, `authors_vs_paper.json`):
+  - ảnh 5 dải, 3 lớp: 82,90 (bài báo 82,90);
+  - RGB, 3 lớp: 79,33 (79,33);
+  - ảnh 5 dải, 6 lớp: 55,52 (55,52);
+  - RGB, 6 lớp: 50,81 (50,81).
+- Đánh giá bằng fp16 chỉ lệch so với fp32 dưới 0,002 điểm. Vì vậy chênh lệch 3,65 điểm của lần chạy 2 **hoàn toàn nằm ở khâu huấn luyện**. Mô hình 5 dải do đề tài tự huấn luyện chỉ ngang mô hình RGB của tác giả.
+- Ma trận nhầm lẫn của mô hình tác giả (ảnh 5 dải) khớp Hình 4 của bài: ngô 0,079 / 0,792 / 0,130; cỏ 0,070 / 0,006 / 0,924. Mô hình đề tài bỏ sót thành nền nhiều hơn: ngô 15,5%, cỏ 12,0%.
+- **Tầng quyết định**, thiết lập chính (216 ô, 108 ô cần phun), `decision_metrics.csv`:
+
+| Mô hình | Chính sách | Giảm thuốc | Chưa quyết | Bỏ sót | Phun nhầm |
+|---|---|---|---|---|---|
+| Đề tài, 5 dải (79,25) | conformal / plug-in | 49,5% / 51,4% | 6,5% / 0% | 0,9% / 5,6% | 1,9% / 2,8% |
+| Tác giả, 5 dải (82,90) | conformal / plug-in | 49,5% / 48,1% | 4,2% / 0% | 3,7% / 3,7% | 4,6% / 7,4% |
+| Tác giả, RGB (79,33) | conformal / plug-in | 51,4% / 58,3% | 3,2% / 0% | 6,5% / **16,7%** | 3,7% / 0% |
+
+- **Nhận xét:**
+  - Với cả 3 mô hình, conformal giữ tỉ lệ bỏ sót và phun nhầm dưới α = β = 0,1, và tỉ lệ chưa quyết chỉ 3–7%.
+  - Plug-in phụ thuộc vào mô hình: với mô hình RGB, plug-in bỏ sót 16,7% (18 ô). Đó là vì mô hình này đoán thiếu cỏ, nên ngưỡng 1% cố định là sai; conformal tự hạ ngưỡng xuống khoảng 0,6–0,8% và kéo tỉ lệ bỏ sót về 6,5%. Đây là luận điểm chính cho tầng quyết định.
+  - mIoU cao hơn không có nghĩa là quyết định tốt hơn. Mô hình tác giả hơn 3,65 điểm mIoU nhưng bỏ sót 4 ô so với 1 ô của mô hình đề tài. Tuy nhiên chênh lệch chỉ vài ô nên chưa kết luận được mô hình nào tốt hơn ở mức quyết định.
+  - Hiệu chỉnh riêng từng ngày yếu như nhau với cả 3 mô hình (25/5 và 6/6 có 85–93% ô chưa quyết), nên đây là giới hạn của dữ liệu, không phải của mô hình.
+
 **Hạn chế:** mỗi cấu hình chỉ chạy một seed; tập test nhỏ (26 ô ảnh, 8 vị trí), nên các tỉ lệ bỏ sót và phun nhầm chỉ dựa trên 1–3 ô lưới; mIoU chỉ vượt ngưỡng C1 1,35 điểm.
 
 ## 6. Việc tiếp theo
 
-1. **Chờ thầy trả lời** ba điểm ở mục 1.4, cùng phản hồi về phần trình bày đề tài và gói ảnh.
-2. **Chạy thêm 2 seed với batch 8** (khoảng 1 giờ GPU mỗi lần) để biết mIoU 79,25 có ổn định không. Phải đổi tên thư mục và tên gói kết quả trong `scripts/make_weeds_notebook.py` (xem mục 4).
+1. **Đối sánh với bài báo** (thầy yêu cầu ngày 05/11), làm theo từng bước:
+   - **Bước 1: đã xong ngày 06/11.** Code đánh giá khớp bài báo; kết quả ở mục 5.
+   - **Bước 2 (chưa quyết, không bắt buộc để viết):** huấn luyện thêm 2 seed với ảnh 5 dải và 3 seed với RGB (khoảng 5 giờ GPU), hoặc chạy biến thể giống hệt tác giả (100 epoch cố định, fp32), để thu hẹp khoảng cách 3,65 điểm. Phương án khác: dùng luôn mô hình công bố của tác giả làm mô hình phân vùng chính (có trích dẫn), và giữ lần tự huấn luyện như phép kiểm tra tái hiện.
+   - **Báo cáo gửi thầy (đã soạn ngày 06/11, dùng mô hình của tác giả làm chính theo lựa chọn của người dùng):** https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs. Gồm tóm tắt, input/output kèm sơ đồ, dữ liệu, đối sánh, tầng quyết định kèm biểu đồ bỏ sót/phun nhầm, tính mới, hạn chế và kế hoạch, 6 điểm xin thầy chốt. Việc tiếp theo: người dùng gửi thầy và hẹn họp chốt.
+2. **Chờ thầy trả lời** ba điểm ở mục 1.4.
 3. **Đọc toàn văn các bài về ngưỡng phun** để thay τ minh họa bằng ngưỡng có nguồn.
 4. **Thiết kế cách hiệu chỉnh lại khi sang đợt bay mới:** hiệu chỉnh riêng từng ngày hiện có quá ít mẫu.
 5. **Làm mô-đun giải thích (XAI)** và phép kiểm chứng độ trung thực (che vùng, có đối chứng ngẫu nhiên).

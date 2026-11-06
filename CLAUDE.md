@@ -63,7 +63,8 @@ Hướng dẫn cho Claude Code khi làm việc với repo này. Người dùng c
 - **Tầng quyết định** (`src/weeds/analyze.py`) chỉ dùng numpy và pandas, chạy cục bộ được.
   - Thiết lập chính: ô lưới 200 điểm ảnh (0,5 m), τ = 1%, α = β = 0,1, gộp 3 ngày trước khi phun. **τ = 1% chỉ là minh họa, chưa có nguồn.**
   - Hiệu chỉnh chéo 2 phần theo vị trí trên tập test, vì tập val đã dùng để chọn mô hình.
-- **Ảnh xem trước cho thầy:** `scripts/export_weeds_images.py` xuất ảnh JPG của cả 156 ô ảnh vào `data/weedsgalore/anh_xem_truoc/`.
+- **Đối sánh với bài báo:** `notebooks/colab_weeds_authors.ipynb` (sinh bởi cùng script) đánh giá các mô hình công bố sẵn của tác giả (`ckpts.zip`) bằng `src/weeds/authors.py`. Nạp checkpoint của bên thứ ba luôn dùng `weights_only=True`.
+- **Ảnh xem trước cho thầy:** `scripts/export_weeds_images.py` xuất ảnh JPG của cả 156 ô ảnh vào `data/weedsgalore/anh_xem_truoc/`. `scripts/make_pipeline_figure.py` vẽ sơ đồ xử lý trên một ô ảnh test thật.
 - `.gitattributes` đặt `* -text` để giữ nguyên từng byte của file dữ liệu và mô hình.
 
 ## Đóng góp của đề tài

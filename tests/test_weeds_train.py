@@ -12,7 +12,7 @@ import pytest
 torch = pytest.importorskip('torch')
 
 from src.weeds import train as T  # noqa: E402
-from src.weeds.data import read_tile, split_ids, to_3class  # noqa: E402
+from src.weeds.data import SEMANTIC_CLASSES, read_tile, split_ids, to_3class  # noqa: E402
 from src.weeds.model import DeepLabV3Plus  # noqa: E402
 
 ZIP = Path(os.environ.get('WEEDSGALORE_ZIP', 'data/weedsgalore/weedsgalore-dataset.zip'))
@@ -60,6 +60,19 @@ def test_confusion_and_iou():
     assert r['crop'] == pytest.approx(200 / 3)
     assert r['weed'] == pytest.approx(50.0)
     assert r['miou'] == pytest.approx((100 / 3 + 200 / 3 + 50) / 3)
+
+
+def test_evaluate_six_classes_rgb(tiny_data):
+    # the authors' 6-class RGB setting: first three bands, semantic labels, every pixel counted once
+    d = T.load_npz(tiny_data / 'weedsgalore_val.npz')
+    model = DeepLabV3Plus(3, 6, pretrained_backbone=False)
+    res = T.evaluate(model, d, torch.device('cpu'), classes=6, bands=3, amp=False)
+    cm = np.array(res['confusion'])
+    assert cm.shape == (6, 6) and cm.sum() == d['y'].size
+    assert cm.sum(1).tolist() == np.bincount(d['y'].ravel(), minlength=6).tolist()
+    assert set(res) == set(SEMANTIC_CLASSES) | {'miou', 'confusion'}
+    with pytest.raises(ValueError):
+        T.evaluate(model, d, torch.device('cpu'), keep_probs=True, classes=6, bands=3)
 
 
 def test_augmentation_keeps_image_and_label_aligned(tiny_data, monkeypatch):

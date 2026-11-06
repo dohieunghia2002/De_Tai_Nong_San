@@ -14,4 +14,4 @@ __pycache__/
 data/
 ket_qua_*.zip
 # Xác suất dự đoán của thí nghiệm thử (khoảng 50 MB, tạo lại được bằng notebook)
-results/weeds_pilot*/probs_*.npz
+results/**/probs_*.npz

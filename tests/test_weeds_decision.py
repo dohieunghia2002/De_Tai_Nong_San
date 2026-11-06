@@ -5,10 +5,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from src.weeds.analyze import PRIMARY, go_no_go
 from src.weeds.data import location_blocks
-from src.weeds.decision import (DEFER, NO_SPRAY, SPRAY, cell_table, decide_conformal, decide_threshold,
-                                decision_metrics, evaluate_crossfit, evaluate_policies, lower_threshold,
-                                upper_threshold)
+from src.weeds.decision import (DEFER, NO_SPRAY, SPRAY, cell_table, crossfit_decisions, decide_conformal,
+                                decide_threshold, decision_metrics, evaluate_crossfit, evaluate_policies,
+                                lower_threshold, upper_threshold)
 
 
 def test_cell_table_fractions():
@@ -135,3 +136,29 @@ def test_crossfit_uses_only_the_other_fold():
     assert r['false_spray_rate'] == pytest.approx(0.5)
     assert r['missed_need_rate'] == pytest.approx(0.5)
     assert evaluate_crossfit(cells, np.zeros(60), tau=0.01, alpha=0.1, beta=0.1) == []
+
+
+def test_crossfit_decisions_are_aligned_with_rows():
+    # folds interleaved row by row: decisions and thresholds must follow each row, not the fold order
+    w = np.array([0.0, 0.0, 0.0, 0.05, 0.05, 0.05] * 10)
+    fold = np.tile([0, 1], 30)
+    s = w + np.where(fold == 0, 0.5, 0.0)
+    cells = pd.DataFrame({'w': w, 's': s, 'crop': 0.0})
+    policies, per_row, per_fold = crossfit_decisions(cells, fold, tau=0.01, alpha=0.1, beta=0.1)
+    for k, info in enumerate(per_fold):
+        assert np.all(per_row['lam_lo'][fold == k] == info['lam_lo'])
+        assert np.all(per_row['lam_hi'][fold == k] == info['lam_hi'])
+    np.testing.assert_array_equal(policies['conformal_3way'],
+                                  decide_conformal(s, per_row['lam_lo'], per_row['lam_hi']))
+    assert crossfit_decisions(cells, np.zeros(60), 0.01, 0.1, 0.1) is None
+
+
+def test_go_no_go_compares_miou_with_the_paper_value_for_the_same_input():
+    key = {k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')}
+    df = pd.DataFrame([{**key, 'policy': p, 'spray_reduction': 0.5, 'deferred': 0.1, 'missed_need_rate': 0.0,
+                        'false_spray_rate': 0.0, 'infestation': 0.5, 'n_cal_need': 10, 'n_cal_no_need': 10,
+                        'lam_lo': (0.01,), 'lam_hi': (0.02,)} for p in (PRIMARY['policy'], 'oracle')])
+    ours = go_no_go(df, {'test': {'miou': 76.0}})['checks']['C1_test_miou']   # our runs: 5-band paper value 82.90
+    assert ours['required'] == '>= 77.90' and not ours['pass']
+    rgb = go_no_go(df, {'test': {'miou': 76.0}, 'paper_test': {'miou': 79.33}})['checks']['C1_test_miou']
+    assert rgb['required'] == '>= 74.33' and rgb['pass']
