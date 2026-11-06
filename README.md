@@ -91,11 +91,13 @@ Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\pyth
 | `src/weeds/decision.py` | Chia ô lưới, ngưỡng conformal theo lớp, các chính sách quyết định, chỉ số ở mức quyết định |
 | `src/weeds/analyze.py` | Chạy tầng quyết định cho mọi thiết lập và kết luận đạt/không đạt |
 | `src/weeds/authors.py` | Đánh giá các mô hình công bố sẵn của tác giả bằng code của đề tài, so với Bảng 3–4 của bài báo |
+| `src/weeds/runs.py` | Các lần huấn luyện thêm (nhiều seed, lịch huấn luyện của tác giả, learning rate giảm dần) và bảng tổng hợp |
 | `scripts/make_weeds_notebook.py` | Sinh 2 notebook Colab có nhúng sẵn mã nguồn `src/weeds/` |
 | `scripts/export_weeds_images.py` | Xuất ảnh xem trước của toàn bộ dữ liệu |
 | `scripts/make_pipeline_figure.py` | Vẽ sơ đồ xử lý của hệ thống trên một ô ảnh test thật |
 | `notebooks/colab_weeds_pilot.ipynb` | Notebook Colab huấn luyện và chạy tầng quyết định (sinh tự động, không sửa tay) |
 | `notebooks/colab_weeds_authors.ipynb` | Notebook Colab đối sánh với bài báo bằng mô hình của tác giả (sinh tự động) |
+| `notebooks/colab_weeds_runs.ipynb` | Notebook Colab chạy các lần huấn luyện thêm, tự chạy tiếp qua nhiều phiên (sinh tự động) |
 | `tests/` | Test đọc dữ liệu, huấn luyện trên ảnh nhỏ (CPU), tầng quyết định |
 | `results/weeds_pilot/`, `results/weeds_pilot_b8/` | Kết quả lần 1 (batch 2) và lần 2 (batch 8); file `probs_*.npz` không commit |
 | `docs/BAN_GIAO_SESSION.md` | Bàn giao giữa các phiên làm việc: tình trạng, kết quả, việc tiếp theo |

@@ -1,6 +1,7 @@
 """Train DeepLabv3+ on WeedsGalore (3 classes, 5-band input), select it on validation mIoU, evaluate on test and save
 per-pixel class probabilities for the decision layer. Settings follow Celikkan et al. 2025 (4.1.1) and their code:
 Adam lr 1e-3, unweighted cross-entropy, rot90 / flip / Gaussian jitter (sd 1/25) augmentation, inputs scaled to [0, 1].
+The learning rate is constant as in their code; --lr-schedule cosine is an optional variant.
 Mixed precision is used to fit 600x600 tiles on a T4. Run on Colab GPU:
 
   python -m src.weeds.train --data <dir with weedsgalore_<split>.npz> --out <dir> [--stage train|test|all] [--smoke]
@@ -118,6 +119,8 @@ def train(args, dev):
     tr, va = load_npz(Path(args.data) / 'weedsgalore_train.npz'), load_npz(Path(args.data) / 'weedsgalore_val.npz')
     model = DeepLabV3Plus(5, 3, pretrained_backbone=not args.no_pretrained).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # 'constant' is the authors' setting; 'cosine' decays the learning rate to zero over args.epochs, one step per epoch
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs) if args.lr_schedule == 'cosine' else None
     scaler = grad_scaler()
     start, best, bad, history = 0, -1.0, 0, []
     if (out / 'last.pt').exists():
@@ -125,6 +128,8 @@ def train(args, dev):
         model.load_state_dict(ck['model'])
         opt.load_state_dict(ck['opt'])
         scaler.load_state_dict(ck['scaler'])
+        if sched is not None:
+            sched.load_state_dict(ck['sched'])
         start, best, bad, history = ck['epoch'] + 1, ck['best_miou'], ck['bad'], ck['history']
         print(f'resumed after epoch {ck["epoch"]} (best val mIoU {best:.2f})')
     if (out / 'best.json').exists():
@@ -136,13 +141,14 @@ def train(args, dev):
     def save_last(epoch):
         tmp = out / 'last.tmp'
         torch.save({'model': model.state_dict(), 'opt': opt.state_dict(), 'scaler': scaler.state_dict(),
+                    'sched': sched.state_dict() if sched is not None else None,
                     'epoch': epoch, 'best_miou': best, 'bad': bad, 'history': history}, tmp)
         tmp.replace(out / 'last.pt')
 
     t0, finished, reason, epoch = time.time(), False, '', None
     for epoch in range(start, args.epochs):
         model.train()
-        te, losses = time.time(), []
+        te, losses, lr = time.time(), [], opt.param_groups[0]['lr']
         for it, (x, y) in enumerate(loader):
             x, y = x.to(dev, non_blocking=True), y.to(dev, non_blocking=True)
             opt.zero_grad(set_to_none=True)
@@ -154,9 +160,11 @@ def train(args, dev):
             losses.append(loss.item())
             if args.max_iters and it + 1 >= args.max_iters:
                 break
+        if sched is not None:
+            sched.step()
         val = evaluate(model, va, dev, limit=args.limit_val)
         secs = time.time() - te
-        history.append({'epoch': epoch, 'train_loss': float(np.mean(losses)), 'val_miou': val['miou'],
+        history.append({'epoch': epoch, 'lr': lr, 'train_loss': float(np.mean(losses)), 'val_miou': val['miou'],
                         **{f'val_{c}': val[c] for c in CLASSES3}, 'seconds': secs})
         if val['miou'] > best:
             best, bad = val['miou'], 0
@@ -186,7 +194,9 @@ def train(args, dev):
     if finished and not args.smoke:
         (out / 'train_done.json').write_text(json.dumps({'reason': reason, 'best_val_miou': best,
                                                          'epochs_run': len(history), 'batch': args.batch,
-                                                         'lr': args.lr, 'seed': args.seed}))
+                                                         'lr': args.lr, 'seed': args.seed, 'epochs': args.epochs,
+                                                         'patience': args.patience,
+                                                         'lr_schedule': args.lr_schedule}))
 
 
 def test(args, dev):
@@ -209,7 +219,7 @@ def test(args, dev):
           f'(diff {report["test_minus_paper_miou"]:+.2f})')
 
 
-def main():
+def parser():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', required=True)
     ap.add_argument('--out', required=True)
@@ -219,6 +229,8 @@ def main():
     ap.add_argument('--batch', type=int, default=2, help='authors\' code default; the paper reports 8 on an A100')
     ap.add_argument('--ckpt-every', type=int, default=5, help='write last.pt (about 0.5 GB) every N epochs and on exit')
     ap.add_argument('--lr', type=float, default=1e-3)
+    ap.add_argument('--lr-schedule', choices=['constant', 'cosine'], default='constant',
+                    help='constant as in the authors\' code; cosine decays to zero over --epochs')
     ap.add_argument('--workers', type=int, default=2)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--budget-hours', type=float, default=3.5)
@@ -226,7 +238,11 @@ def main():
     ap.add_argument('--limit-val', type=int, default=None, help='evaluate only the first N tiles (smoke test)')
     ap.add_argument('--smoke', action='store_true', help='1 epoch of 2 iterations, 2 evaluation tiles')
     ap.add_argument('--no-pretrained', action='store_true', help='random backbone (local tests only; skips download)')
-    args = ap.parse_args()
+    return ap
+
+
+def main():
+    args = parser().parse_args()
     if args.smoke:
         args.epochs, args.max_iters, args.limit_val, args.patience = 1, 2, 2, 1
     random.seed(args.seed)

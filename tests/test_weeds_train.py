@@ -2,6 +2,7 @@
 seconds). Skipped without PyTorch or without the dataset zip (set WEEDSGALORE_ZIP)."""
 import argparse
 import json
+import math
 import os
 import zipfile
 from pathlib import Path
@@ -37,8 +38,8 @@ def tiny_data(tmp_path_factory):
 
 def make_args(data, out, **kw):
     a = argparse.Namespace(data=str(data), out=str(out), stage='train', epochs=2, patience=30, batch=2, ckpt_every=1,
-                           lr=1e-3, workers=0, seed=0, budget_hours=3.5, max_iters=0, limit_val=None, smoke=False,
-                           no_pretrained=True)
+                           lr=1e-3, lr_schedule='constant', workers=0, seed=0, budget_hours=3.5, max_iters=0,
+                           limit_val=None, smoke=False, no_pretrained=True)
     vars(a).update(kw)
     return a
 
@@ -120,3 +121,16 @@ def test_train_resume_and_test(tiny_data, tmp_path):
         assert ids == list(T.load_npz(tiny_data / f'weedsgalore_{split}.npz')['ids'])
     seg = json.loads((out / 'segmentation_metrics.json').read_text())
     assert set(seg) >= {'val', 'test', 'paper_test_3class_msi', 'test_minus_paper_miou'}
+
+
+def test_cosine_schedule_survives_resume(tiny_data, tmp_path):
+    # stopped by the time budget after the first epoch, then resumed: the learning rates must still follow one cosine
+    out = tmp_path / 'cosine'
+    T.train(make_args(tiny_data, out, epochs=3, lr_schedule='cosine', budget_hours=1e-9), torch.device('cpu'))
+    assert not (out / 'train_done.json').exists()
+    assert len(json.loads((out / 'history.json').read_text())) == 1
+    T.train(make_args(tiny_data, out, epochs=3, lr_schedule='cosine'), torch.device('cpu'))
+    lrs = [h['lr'] for h in json.loads((out / 'history.json').read_text())]
+    assert lrs == pytest.approx([1e-3 * (1 + math.cos(math.pi * k / 3)) / 2 for k in range(3)])
+    done = json.loads((out / 'train_done.json').read_text())
+    assert (done['lr_schedule'], done['epochs'], done['patience']) == ('cosine', 3, 30)

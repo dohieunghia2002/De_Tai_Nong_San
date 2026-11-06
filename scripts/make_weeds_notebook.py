@@ -2,13 +2,15 @@
 to GitHub. Rerun after any change in src/weeds:  python scripts/make_weeds_notebook.py
   notebooks/colab_weeds_pilot.ipynb    train DeepLabv3+, evaluate, decision layer (pilot runs)
   notebooks/colab_weeds_authors.ipynb  evaluate the authors' released checkpoints, decision layer on their model
+  notebooks/colab_weeds_runs.ipynb     further training runs (seeds, schedules) of src/weeds/runs.py
 """
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = ['src/__init__.py'] + [f'src/weeds/{m}.py' for m in ('__init__', 'data', 'model', 'train', 'decision',
-                                                                 'analyze', 'authors')]
+                                                                 'analyze', 'authors', 'runs')]
 ZIP_URL = 'https://doidata.gfz.de/weedsgalore_e_celikkan_2024/weedsgalore-dataset.zip'
 ZIP_BYTES = 336989804  # size served by GFZ on 2026-10-29
 
@@ -294,3 +296,129 @@ md('''
 ''')
 
 write_notebook('colab_weeds_authors.ipynb')
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Further training runs: seeds and schedules (src/weeds/runs.py), to explain the gap to the paper
+# ---------------------------------------------------------------------------------------------------------------------
+sys.path.insert(0, str(ROOT))
+from src.weeds.runs import RUNS  # noqa: E402
+
+LABEL = {('constant', True): '100 epoch cố định, như code của tác giả',
+         ('cosine', True): '100 epoch, learning rate giảm dần (cosine)',
+         ('constant', False): 'dừng sớm như lần chạy 2 (tối đa 200 epoch)'}
+HOURS = {True: 'khoảng 30 phút', False: 'khoảng 45–60 phút'}  # 17.5 s per epoch in run 2
+
+
+def fixed(r):
+    return r['patience'] >= r['epochs']
+
+
+run_table = '\n'.join(f"| {i + 1} | `{r['name']}` | {LABEL[(r['lr_schedule'], fixed(r))]} | {r['seed']} | "
+                      f'{HOURS[fixed(r)]} |' for i, r in enumerate(RUNS))
+md(f'''
+# Huấn luyện thêm: nhiều seed và biến thể, để thu hẹp khoảng cách với bài báo
+
+Lần chạy 2 của đề tài đạt mIoU test 79,25 (1 seed), thấp hơn bài báo 3,65 điểm. Mô hình công bố của tác giả, chạy qua cùng code đánh giá, ra đúng 82,90, nên chênh lệch nằm ở khâu huấn luyện. Code huấn luyện của tác giả chỉ khác code đề tài ở lịch huấn luyện: 100 epoch cố định, không dừng sớm. Notebook này chạy các lần sau theo thứ tự ưu tiên, đều với batch 8 và ảnh 5 dải:
+
+| Thứ tự | Tên | Lịch huấn luyện | Seed | Thời gian ước tính |
+| --- | --- | --- | --- | --- |
+{run_table}
+
+Mỗi lần chạy: huấn luyện, đánh giá trên tập test, rồi chạy tầng quyết định. Tổng cộng khoảng 4 giờ GPU, tức **2 phiên Colab**.
+
+**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mỗi phiên tự dừng an toàn sau khoảng 3,5 giờ. Khi thấy dòng "Hết thời gian của phiên này", hôm sau mở lại notebook và **Run all lại**: lần đã xong tự bỏ qua, lần đang dở chạy tiếp từ checkpoint.
+
+- Mỗi lần chạy chiếm khoảng 0,2 GB trên Drive sau khi xong (mô hình tốt nhất và xác suất dự đoán); trong lúc chạy cần thêm khoảng 0,5 GB cho checkpoint.
+- Giữ tab Colab mở trong lúc chạy. Nếu một bước bị lỗi, gửi thông báo lỗi cho Claude.
+
+Kết quả nằm trong `MyDrive/De_Tai_Nong_San/weeds_pilot/runs/`. Mục cuối tạo file `ket_qua_weeds_runs.zip` để tải về.
+''')
+
+md('## 1. Kết nối Drive và ghi mã nguồn (chạy ở **mọi** phiên)')
+code(setup_code('''
+RUN = BASE / 'runs'  # one folder per run of src/weeds/runs.py; run 2 stays in run_dlv3p_msi_seed0_b8
+RESULTS = Path('results/weeds_runs')  # folder inside the downloaded zip
+''', "print('Thư mục kết quả:', RUN)"))
+
+md('## 2. Phần A: tải và chuẩn bị dữ liệu (bỏ qua nếu đã có từ các notebook trước)')
+code(DATA_CODE)
+
+md('''
+## 3. Phần B: kiểm tra GPU và chép dữ liệu về máy Colab
+
+Trước mục này: *Runtime → Change runtime type → T4 GPU*, rồi chạy lại mục 1.
+''')
+code(gpu_code(('train', 'val', 'test')))
+
+md('''
+## 4. Chạy thử (chỉ ở phiên đầu, vài phút)
+
+Chạy 1 epoch chỉ 2 vòng lặp để bắt lỗi trước khi huấn luyện thật. Từ phiên thứ hai trở đi, mục này tự bỏ qua.
+''')
+code('''
+import time
+from src.weeds.runs import RUNS, by_schedule, summarize, train_args
+
+T0 = time.time()  # session clock: training stops in time to test, analyse and package before the Colab limit
+SESSION_HOURS = 3.5
+if not any((RUN / r['name'] / 'history.json').exists() for r in RUNS):
+    shutil.rmtree('/content/smoke', ignore_errors=True)
+    run('src.weeds.train', '--data', DATA, '--out', '/content/smoke', '--smoke', '--batch', 8)
+else:
+    print('Đã có lần chạy bắt đầu từ phiên trước: bỏ qua chạy thử.')
+''')
+
+md('''
+## 5. Huấn luyện, đánh giá và tầng quyết định cho từng lần chạy
+
+Mỗi epoch in một dòng như notebook thí nghiệm thử. Lần đã xong (có `go_no_go.json`) được bỏ qua. Khi một lần xong, checkpoint `last.pt` (khoảng 0,5 GB) được xóa để tiết kiệm Drive; mô hình tốt nhất `best.pt` được giữ lại.
+''')
+code('''
+for r in RUNS:
+    out = RUN / r['name']
+    if (out / 'go_no_go.json').exists():
+        print(f"{r['name']}: đã xong, bỏ qua.")
+        continue
+    left = SESSION_HOURS - (time.time() - T0) / 3600
+    if left < 0.3:
+        print(f'Hết thời gian của phiên này (còn {left:.2f} giờ). Phiên sau: Run all lại, các lần đã xong tự bỏ qua.')
+        break
+    print(f"\\n========== {r['name']} | phiên còn {left:.2f} giờ ==========")
+    run('src.weeds.train', '--stage', 'train', '--data', DATA, '--out', out, *train_args(r),
+        '--budget-hours', f'{left - 0.15:.2f}')  # 0.15 h kept for test, decision layer and packaging
+    if not (out / 'train_done.json').exists():
+        print(f"{r['name']}: chưa huấn luyện xong, sẽ chạy tiếp từ checkpoint ở phiên sau.")
+        break
+    run('src.weeds.train', '--stage', 'test', '--data', DATA, '--out', out)
+    run('src.weeds.analyze', '--data', DATA, '--out', out)
+    (out / 'last.pt').unlink(missing_ok=True)
+''')
+
+md('## 6. Tổng hợp các lần chạy đã xong (kèm lần chạy 2)')
+code('''
+import pandas as pd
+pd.set_option('display.width', 220)
+dirs = {'es_seed0 (lần chạy 2)': BASE / 'run_dlv3p_msi_seed0_b8', **{r['name']: RUN / r['name'] for r in RUNS}}
+df = summarize(dirs)
+print(df.round(3).to_string(index=False))
+print('\\nmIoU test theo lịch huấn luyện (bài báo: 82,90; mô hình công bố của tác giả qua code đề tài: 82,90):')
+print(by_schedule(df).round(2).to_string(index=False))
+df.to_csv(RUN / 'runs_summary.csv', index=False)
+''')
+
+md('## 7. Đóng gói kết quả (chỉ file json và csv; mô hình và xác suất dự đoán ở lại trên Drive)')
+code('''
+import zipfile
+ZIP_OUT = BASE / 'ket_qua_weeds_runs.zip'
+with zipfile.ZipFile(ZIP_OUT, 'w', zipfile.ZIP_DEFLATED) as z:
+    for f in sorted(RUN.rglob('*')):
+        if f.suffix in ('.json', '.csv'):
+            z.write(f, RESULTS / f.relative_to(RUN))
+print('Đã tạo', ZIP_OUT, f'({ZIP_OUT.stat().st_size / 1e6:.1f} MB)')
+''')
+
+md('''
+**Bước tiếp theo:** khi cả 6 lần đã xong (hoặc muốn xem kết quả giữa chừng), tải `ket_qua_weeds_runs.zip` về, giải nén vào thư mục gốc của repo (sẽ tạo thư mục `results/weeds_runs/`), rồi nhờ Claude phân tích.
+''')
+
+write_notebook('colab_weeds_runs.ipynb')

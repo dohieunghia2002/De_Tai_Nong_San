@@ -111,7 +111,8 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
   - Nếu chạy lần mới với cùng batch (ví dụ seed khác), phải đổi tên thư mục và tên gói trong script, nếu không sẽ bị bỏ qua hoặc ghi đè.
 - `notebooks/colab_weeds_authors.ipynb` (sinh bởi cùng script): tải `ckpts.zip` lên Drive, đánh giá 4 mô hình của tác giả, chạy tầng quyết định trên 2 mô hình 3 lớp, rồi đóng gói thành `ket_qua_weeds_authors.zip`. Giải nén gói này vào `results/weeds_authors/`.
 - Trên runtime T4 chỉ cần bấm Run all; lỗi ở bước nào thì dừng ở bước đó.
-- Có 30 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
+- `src/weeds/runs.py` định nghĩa các lần huấn luyện thêm và hàm tổng hợp; `train.py` có thêm `--lr-schedule cosine`, lưu trạng thái lịch learning rate trong checkpoint để chạy tiếp đúng; `train_done.json` ghi thêm epochs, patience, lr_schedule. `notebooks/colab_weeds_runs.ipynb` sinh bởi cùng script.
+- Có 34 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
 
 ## 5. Kết quả thí nghiệm thử
 
@@ -176,7 +177,14 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
 
 1. **Đối sánh với bài báo** (thầy yêu cầu ngày 05/11), làm theo từng bước:
    - **Bước 1: đã xong ngày 06/11.** Code đánh giá khớp bài báo; kết quả ở mục 5.
-   - **Bước 2 (chưa quyết, không bắt buộc để viết):** huấn luyện thêm 2 seed với ảnh 5 dải và 3 seed với RGB (khoảng 5 giờ GPU), hoặc chạy biến thể giống hệt tác giả (100 epoch cố định, fp32), để thu hẹp khoảng cách 3,65 điểm. Phương án khác: dùng luôn mô hình công bố của tác giả làm mô hình phân vùng chính (có trích dẫn), và giữ lần tự huấn luyện như phép kiểm tra tái hiện.
+   - **Bước 2 (người dùng yêu cầu ngày 06/11, notebook đã sẵn sàng, chưa chạy):** `notebooks/colab_weeds_runs.ipynb` chạy 6 lần huấn luyện định nghĩa trong `src/weeds/runs.py`, theo thứ tự ưu tiên:
+     - 3 seed với lịch của tác giả: 100 epoch cố định, learning rate không đổi;
+     - 1 lần 100 epoch với learning rate giảm dần (cosine);
+     - 2 seed với lịch của lần chạy 2 (dừng sớm).
+     Tổng khoảng 4 giờ GPU, 2 phiên Colab; notebook tự chạy tiếp phiên sau. Kết quả: `ket_qua_weeds_runs.zip`, giải nén vào `results/weeds_runs/`, chỉ gồm json và csv.
+     - Đã đối chiếu kỹ code huấn luyện của tác giả: loss, tăng cường ảnh, DataLoader, khởi tạo mô hình đều giống. Chỉ khác lịch huấn luyện, cách chọn checkpoint và fp32/A100. fp32 không thử vì batch 8 ở fp32 nhiều khả năng không vừa bộ nhớ T4.
+     - Lần chạy 2: mIoU val tốt nhất trong 100 epoch đầu là 83,19 (epoch 94), cả quá trình là 83,94 (epoch 149). Như vậy chỉ rút về 100 epoch chưa chắc giúp ích.
+   - Mô hình phân vùng chính trong báo cáo gửi thầy là mô hình công bố của tác giả; các lần tự huấn luyện là phép kiểm tra khả năng tái hiện.
    - **Báo cáo gửi thầy (đã soạn ngày 06/11, dùng mô hình của tác giả làm chính theo lựa chọn của người dùng):** https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs. Gồm tóm tắt, input/output kèm sơ đồ, dữ liệu, đối sánh, tầng quyết định kèm biểu đồ bỏ sót/phun nhầm, tính mới, hạn chế và kế hoạch, 6 điểm xin thầy chốt. Việc tiếp theo: người dùng gửi thầy và hẹn họp chốt.
 2. **Chờ thầy trả lời** ba điểm ở mục 1.4.
 3. **Đọc toàn văn các bài về ngưỡng phun** để thay τ minh họa bằng ngưỡng có nguồn.
