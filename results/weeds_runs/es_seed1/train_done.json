@@ -1,0 +1,1 @@
+{"reason": "early stopping: no val improvement for 30 epochs", "best_val_miou": 82.54865248022334, "epochs_run": 102, "batch": 8, "lr": 0.001, "seed": 1, "epochs": 200, "patience": 30, "lr_schedule": "constant"}

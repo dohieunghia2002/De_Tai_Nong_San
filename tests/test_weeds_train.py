@@ -37,9 +37,9 @@ def tiny_data(tmp_path_factory):
 
 
 def make_args(data, out, **kw):
-    a = argparse.Namespace(data=str(data), out=str(out), stage='train', epochs=2, patience=30, batch=2, ckpt_every=1,
-                           lr=1e-3, lr_schedule='constant', workers=0, seed=0, budget_hours=3.5, max_iters=0,
-                           limit_val=None, smoke=False, no_pretrained=True)
+    a = argparse.Namespace(data=str(data), out=str(out), stage='train', weights='best', epochs=2, patience=30, batch=2,
+                           ckpt_every=1, lr=1e-3, lr_schedule='constant', workers=0, seed=0, budget_hours=3.5,
+                           max_iters=0, limit_val=None, smoke=False, no_pretrained=True)
     vars(a).update(kw)
     return a
 
@@ -92,27 +92,37 @@ def test_augmentation_keeps_image_and_label_aligned(tiny_data, monkeypatch):
 
 def test_train_resume_and_test(tiny_data, tmp_path):
     out = tmp_path / 'run'
-    T.train(make_args(tiny_data, out), torch.device('cpu'))
+    cpu = torch.device('cpu')
+    # stopped by the time budget after the first epoch: not finished; the checkpoint carries its settings
+    T.train(make_args(tiny_data, out, epochs=3, budget_hours=1e-9), cpu)
+    assert not (out / 'train_done.json').exists()
+    ck = torch.load(out / 'last.pt', weights_only=False)
+    assert ck['epoch'] == 0 and ck['config']['epochs'] == 3 and ck['gen'].dtype == torch.uint8
+
+    # resuming with other settings is refused, whatever the setting
+    for change in ({'epochs': 4}, {'lr_schedule': 'cosine'}, {'seed': 1}):
+        with pytest.raises(ValueError):
+            T.train(make_args(tiny_data, out, **{'epochs': 3, **change}), cpu)
+
+    # resumed with the same settings: runs to the end
+    T.train(make_args(tiny_data, out, epochs=3), cpu)
     for f in ('best.pt', 'best.json', 'last.pt', 'history.json', 'train_done.json'):
         assert (out / f).exists(), f
-    assert len(json.loads((out / 'history.json').read_text())) == 2
-    done = json.loads((out / 'train_done.json').read_text())
-    assert 'reached 2 epochs' in done['reason']
-    assert (done['batch'], done['lr'], done['seed']) == (2, 1e-3, 0)  # the run records its own settings
-
-    # a finished run is not trained again
-    T.train(make_args(tiny_data, out), torch.device('cpu'))
-    assert len(json.loads((out / 'history.json').read_text())) == 2
-
-    # resume from last.pt for one more epoch
-    (out / 'train_done.json').unlink()
-    T.train(make_args(tiny_data, out, epochs=3), torch.device('cpu'))
     hist = json.loads((out / 'history.json').read_text())
     assert [h['epoch'] for h in hist] == [0, 1, 2]
-    best = json.loads((out / 'best.json').read_text())['val_miou']
-    assert best == pytest.approx(max(h['val_miou'] for h in hist))
+    done = json.loads((out / 'train_done.json').read_text())
+    assert 'reached 3 epochs' in done['reason']
+    # the run records its own settings
+    assert (done['batch'], done['lr'], done['seed'], done['epochs'], done['patience']) == (2, 1e-3, 0, 3, 30)
+    best = json.loads((out / 'best.json').read_text())
+    assert best['val_miou'] == pytest.approx(max(h['val_miou'] for h in hist))
 
-    T.test(make_args(tiny_data, out, stage='test'), torch.device('cpu'))
+    # a finished run is not trained again
+    T.train(make_args(tiny_data, out, epochs=3), cpu)
+    assert len(json.loads((out / 'history.json').read_text())) == 3
+
+    T.test(make_args(tiny_data, out, stage='test'), cpu)
+    test_ids = list(T.load_npz(tiny_data / 'weedsgalore_test.npz')['ids'])
     for split in ('val', 'test'):
         with np.load(out / f'probs_{split}.npz') as p:
             ids = list(p['ids'].astype(str))
@@ -120,7 +130,25 @@ def test_train_resume_and_test(tiny_data, tmp_path):
             assert np.all((p['p_crop'].astype(float) + p['p_weed'].astype(float)) <= 1.001)
         assert ids == list(T.load_npz(tiny_data / f'weedsgalore_{split}.npz')['ids'])
     seg = json.loads((out / 'segmentation_metrics.json').read_text())
-    assert set(seg) >= {'val', 'test', 'paper_test_3class_msi', 'test_minus_paper_miou'}
+    assert set(seg) >= {'model', 'val', 'test', 'test_by_date', 'paper_test_3class_msi', 'test_minus_paper_miou'}
+    assert seg['model'] == {'weights': 'best', **best}
+    # every test pixel is counted once across the acquisition dates
+    assert set(seg['test_by_date']) == {t[:10] for t in test_ids}
+    per_date = sum(np.array(r['confusion']) for r in seg['test_by_date'].values())
+    assert (per_date == np.array(seg['test']['confusion'])).all()
+
+    # the final-epoch model: same outputs, in last/
+    T.test(make_args(tiny_data, out, stage='test', weights='last'), cpu)
+    last = json.loads((out / 'last' / 'segmentation_metrics.json').read_text())
+    assert last['model'] == {'weights': 'last', 'epoch': 2}
+    assert (out / 'last' / 'probs_test.npz').exists() and (out / 'last' / 'probs_val.npz').exists()
+
+
+def test_last_epoch_finishes_whatever_the_clock(tiny_data, tmp_path):
+    # the time budget is checked only before epochs that remain: a run whose last epoch is done is finished
+    out = tmp_path / 'one'
+    T.train(make_args(tiny_data, out, epochs=1, budget_hours=1e-9), torch.device('cpu'))
+    assert 'reached 1 epochs' in json.loads((out / 'train_done.json').read_text())['reason']
 
 
 def test_cosine_schedule_survives_resume(tiny_data, tmp_path):

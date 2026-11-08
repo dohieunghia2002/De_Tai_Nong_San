@@ -1,0 +1,1 @@
+{"reason": "reached 100 epochs", "best_val_miou": 82.15982627950766, "epochs_run": 100, "batch": 8, "lr": 0.001, "seed": 0, "epochs": 100, "patience": 100, "lr_schedule": "cosine"}

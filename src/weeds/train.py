@@ -19,7 +19,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-from src.weeds.data import CLASSES3, PAPER_TEST_3CLASS_MSI, SEMANTIC_CLASSES, load_npz, to_3class
+from src.weeds.data import CLASSES3, PAPER_TEST_3CLASS_MSI, SEMANTIC_CLASSES, load_npz, tile_date, to_3class
 from src.weeds.model import DeepLabV3Plus
 
 
@@ -122,27 +122,41 @@ def train(args, dev):
     # 'constant' is the authors' setting; 'cosine' decays the learning rate to zero over args.epochs, one step per epoch
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs) if args.lr_schedule == 'cosine' else None
     scaler = grad_scaler()
+    # settings a resumed run must share with the checkpoint it resumes from
+    config = {k: getattr(args, k) for k in ('batch', 'lr', 'seed', 'epochs', 'patience', 'lr_schedule')}
+    gen = torch.Generator().manual_seed(args.seed)  # draws the shuffling order and the worker seeds; saved in last.pt
     start, best, bad, history = 0, -1.0, 0, []
     if (out / 'last.pt').exists():
         ck = torch_load(out / 'last.pt', dev)
+        saved = ck.get('config')  # absent in checkpoints written before it was stored: constant schedule only
+        if (saved is None and args.lr_schedule != 'constant') or (saved is not None and saved != config):
+            raise ValueError(f'{out / "last.pt"} was written with settings {saved}, this run has {config}: '
+                             'use a new output folder')
         model.load_state_dict(ck['model'])
         opt.load_state_dict(ck['opt'])
         scaler.load_state_dict(ck['scaler'])
         if sched is not None:
             sched.load_state_dict(ck['sched'])
+        if 'gen' in ck:
+            gen.set_state(ck['gen'].cpu())  # map_location moved it to the GPU; a CPU generator needs a CPU tensor
+        else:
+            gen.manual_seed(args.seed + ck['epoch'] + 1)  # how checkpoints without a saved generator state resumed
         start, best, bad, history = ck['epoch'] + 1, ck['best_miou'], ck['bad'], ck['history']
         print(f'resumed after epoch {ck["epoch"]} (best val mIoU {best:.2f})')
     if (out / 'best.json').exists():
-        # best.pt may be newer than last.pt (last.pt is written every few epochs): never let a worse model replace it
-        best = max(best, json.loads((out / 'best.json').read_text())['val_miou'])
+        saved_best = json.loads((out / 'best.json').read_text())['val_miou']
+        if saved_best > best:
+            # best.pt was written after last.pt, on epochs that resuming repeats with other random draws: keep that
+            # model (a worse one never replaces it) and count patience afresh from the resumed epoch
+            best, bad = saved_best, 0
     loader = DataLoader(TileDataset(tr, augment=True), batch_size=args.batch, shuffle=True, drop_last=True,
                         num_workers=args.workers, worker_init_fn=seed_worker, pin_memory=dev.type == 'cuda',
-                        generator=torch.Generator().manual_seed(args.seed + start))
+                        generator=gen)
     def save_last(epoch):
         tmp = out / 'last.tmp'
         torch.save({'model': model.state_dict(), 'opt': opt.state_dict(), 'scaler': scaler.state_dict(),
-                    'sched': sched.state_dict() if sched is not None else None,
-                    'epoch': epoch, 'best_miou': best, 'bad': bad, 'history': history}, tmp)
+                    'sched': sched.state_dict() if sched is not None else None, 'gen': gen.get_state(),
+                    'config': config, 'epoch': epoch, 'best_miou': best, 'bad': bad, 'history': history}, tmp)
         tmp.replace(out / 'last.pt')
 
     t0, finished, reason, epoch = time.time(), False, '', None
@@ -183,7 +197,8 @@ def train(args, dev):
         if bad >= args.patience:
             finished, reason = True, f'early stopping: no val improvement for {args.patience} epochs'
             break
-        if time.time() - t0 + 1.5 * secs > args.budget_hours * 3600:
+        # (the last epoch is done whatever the clock says: it ends the loop through the else below)
+        if epoch + 1 < args.epochs and time.time() - t0 + 1.5 * secs > args.budget_hours * 3600:
             reason = f'time budget of {args.budget_hours} h reached: rerun to resume'
             break
     else:
@@ -199,22 +214,41 @@ def train(args, dev):
                                                          'lr_schedule': args.lr_schedule}))
 
 
+def by_date(d, n):
+    """The first n tiles of a split, grouped by acquisition date."""
+    dates = [tile_date(t) for t in d['ids'][:n]]
+    return {day: {k: d[k][[i for i, x in enumerate(dates) if x == day]] for k in ('ids', 'x', 'y')}
+            for day in sorted(set(dates))}
+
+
 def test(args, dev):
+    """Evaluate the model chosen on validation (best.pt), or with --weights last the final-epoch model kept in
+    last.pt, whose outputs go to <out>/last/. Saves the probabilities for the decision layer and the test mIoU per
+    acquisition date."""
     out = Path(args.out)
     model = DeepLabV3Plus(5, 3, pretrained_backbone=False).to(dev)
-    model.load_state_dict(torch_load(out / 'best.pt', dev))
-    report = {}
+    if args.weights == 'last':
+        ck = torch_load(out / 'last.pt', dev)
+        model.load_state_dict(ck['model'])
+        dest, info = out / 'last', {'weights': 'last', 'epoch': ck['epoch']}
+        dest.mkdir(exist_ok=True)
+    else:
+        model.load_state_dict(torch_load(out / 'best.pt', dev))
+        dest, info = out, {'weights': 'best', **json.loads((out / 'best.json').read_text())}
+    report = {'model': info}
     for split in ('val', 'test'):
         d = load_npz(Path(args.data) / f'weedsgalore_{split}.npz')
         res, probs = evaluate(model, d, dev, keep_probs=True, limit=args.limit_val)
         n = len(probs)
-        np.savez_compressed(out / f'probs_{split}.npz', ids=d['ids'][:n], p_crop=probs[:, 0], p_weed=probs[:, 1])
+        np.savez_compressed(dest / f'probs_{split}.npz', ids=d['ids'][:n], p_crop=probs[:, 0], p_weed=probs[:, 1])
         report[split] = res
         print(f'{split}: mIoU {res["miou"]:.2f} | background {res["background"]:.2f}, crop {res["crop"]:.2f}, '
               f'weed {res["weed"]:.2f}')
+        if split == 'test':
+            report['test_by_date'] = {day: evaluate(model, sub, dev) for day, sub in by_date(d, n).items()}
     report['paper_test_3class_msi'] = PAPER_TEST_3CLASS_MSI
     report['test_minus_paper_miou'] = report['test']['miou'] - PAPER_TEST_3CLASS_MSI['miou']
-    (out / 'segmentation_metrics.json').write_text(json.dumps(report, indent=1))
+    (dest / 'segmentation_metrics.json').write_text(json.dumps(report, indent=1))
     print(f'test mIoU {report["test"]["miou"]:.2f} vs paper {PAPER_TEST_3CLASS_MSI["miou"]:.2f} '
           f'(diff {report["test_minus_paper_miou"]:+.2f})')
 
@@ -224,6 +258,8 @@ def parser():
     ap.add_argument('--data', required=True)
     ap.add_argument('--out', required=True)
     ap.add_argument('--stage', choices=['train', 'test', 'all'], default='all')
+    ap.add_argument('--weights', choices=['best', 'last'], default='best',
+                    help='test stage: the model chosen on validation, or the final-epoch model in last.pt')
     ap.add_argument('--epochs', type=int, default=200)
     ap.add_argument('--patience', type=int, default=30)
     ap.add_argument('--batch', type=int, default=2, help='authors\' code default; the paper reports 8 on an A100')

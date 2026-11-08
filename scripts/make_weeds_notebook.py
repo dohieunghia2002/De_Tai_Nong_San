@@ -301,20 +301,25 @@ write_notebook('colab_weeds_authors.ipynb')
 # Further training runs: seeds and schedules (src/weeds/runs.py), to explain the gap to the paper
 # ---------------------------------------------------------------------------------------------------------------------
 sys.path.insert(0, str(ROOT))
-from src.weeds.runs import RUNS  # noqa: E402
+from src.weeds.runs import RUNS, fixed  # noqa: E402
 
-LABEL = {('constant', True): '100 epoch cố định, như code của tác giả',
-         ('cosine', True): '100 epoch, learning rate giảm dần (cosine)',
-         ('constant', False): 'dừng sớm như lần chạy 2 (tối đa 200 epoch)'}
-HOURS = {True: 'khoảng 30 phút', False: 'khoảng 45–60 phút'}  # 17.5 s per epoch in run 2
+SECONDS_PER_EPOCH = 17.5  # run 2 on a Colab T4, batch 8
 
 
-def fixed(r):
-    return r['patience'] >= r['epochs']
+def label(r):
+    """Vietnamese description of a run's schedule, built from its own fields."""
+    s = (f"{r['epochs']} epoch cố định" if fixed(r)
+         else f"dừng sớm sau {r['patience']} epoch không cải thiện (tối đa {r['epochs']} epoch)")
+    return s + (', learning rate giảm dần (cosine)' if r['lr_schedule'] == 'cosine' else ', learning rate không đổi')
 
 
-run_table = '\n'.join(f"| {i + 1} | `{r['name']}` | {LABEL[(r['lr_schedule'], fixed(r))]} | {r['seed']} | "
-                      f'{HOURS[fixed(r)]} |' for i, r in enumerate(RUNS))
+def duration(r):
+    minutes = round(r['epochs'] * SECONDS_PER_EPOCH / 60)
+    return f'khoảng {minutes} phút' if fixed(r) else f'tối đa khoảng {minutes} phút'
+
+
+run_table = '\n'.join(f"| {i + 1} | `{r['name']}` | {label(r)} | {r['seed']} | {duration(r)} |"
+                      for i, r in enumerate(RUNS))
 md(f'''
 # Huấn luyện thêm: nhiều seed và biến thể, để thu hẹp khoảng cách với bài báo
 
@@ -324,11 +329,13 @@ Lần chạy 2 của đề tài đạt mIoU test 79,25 (1 seed), thấp hơn bà
 | --- | --- | --- | --- | --- |
 {run_table}
 
-Mỗi lần chạy: huấn luyện, đánh giá trên tập test, rồi chạy tầng quyết định. Tổng cộng khoảng 4 giờ GPU, tức **2 phiên Colab**.
+Mỗi lần chạy: huấn luyện, rồi đánh giá trên tập test và chạy tầng quyết định cho **hai mô hình**: mô hình có mIoU val cao nhất (như lần chạy 2) và mô hình ở epoch cuối. Lý do: lần chạy 2 có val 83,94 nhưng test chỉ 79,25, còn mô hình của tác giả có val 79,53 và test 82,90; chọn epoch có val cao nhất trong nhiều epoch dao động có thể chọn trúng một epoch "may mắn" trên val. Mô hình epoch cuối của lần chạy 2 cũng được đánh giá ở đầu phiên đầu tiên (vài phút).
 
-**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mỗi phiên tự dừng an toàn sau khoảng 3,5 giờ. Khi thấy dòng "Hết thời gian của phiên này", hôm sau mở lại notebook và **Run all lại**: lần đã xong tự bỏ qua, lần đang dở chạy tiếp từ checkpoint.
+Tổng cộng tối đa khoảng 4–4,5 giờ GPU, tức **2 phiên Colab**.
 
-- Mỗi lần chạy chiếm khoảng 0,2 GB trên Drive sau khi xong (mô hình tốt nhất và xác suất dự đoán); trong lúc chạy cần thêm khoảng 0,5 GB cho checkpoint.
+**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mỗi phiên tự dừng huấn luyện sau khoảng 3,5 giờ tính từ lúc máy Colab khởi động (chạy lại notebook trên cùng máy không làm đồng hồ đếm lại). Khi thấy dòng "Hết thời gian của phiên này", hôm sau mở lại notebook và **Run all lại**: lần đã xong tự bỏ qua, lần đang dở chạy tiếp từ checkpoint. Cuối notebook có lệnh ghi hết dữ liệu lên Drive; chờ nó xong rồi mới đóng phiên.
+
+- Mỗi lần chạy chiếm khoảng 0,25 GB trên Drive sau khi xong (mô hình tốt nhất và xác suất dự đoán của hai mô hình); trong lúc chạy cần thêm khoảng 0,5 GB cho checkpoint, được xóa khi lần chạy xong. File xóa trên Drive nằm trong Thùng rác 30 ngày: nếu Drive gần đầy, hãy dọn Thùng rác.
 - Giữ tab Colab mở trong lúc chạy. Nếu một bước bị lỗi, gửi thông báo lỗi cho Claude.
 
 Kết quả nằm trong `MyDrive/De_Tai_Nong_San/weeds_pilot/runs/`. Mục cuối tạo file `ket_qua_weeds_runs.zip` để tải về.
@@ -349,21 +356,27 @@ md('''
 Trước mục này: *Runtime → Change runtime type → T4 GPU*, rồi chạy lại mục 1.
 ''')
 code(gpu_code(('train', 'val', 'test')))
-
-md('''
-## 4. Chạy thử (chỉ ở phiên đầu, vài phút)
-
-Chạy 1 epoch chỉ 2 vòng lặp để bắt lỗi trước khi huấn luyện thật. Từ phiên thứ hai trở đi, mục này tự bỏ qua.
-''')
 code('''
 import time
 from src.weeds.runs import RUNS, by_schedule, summarize, train_args
 
-T0 = time.time()  # session clock: training stops in time to test, analyse and package before the Colab limit
-SESSION_HOURS = 3.5
+# the session clock counts from the start of this Colab VM, so running the notebook again on it does not reset it
+T0 = time.time() - float(Path('/proc/uptime').read_text().split()[0])
+SESSION_HOURS = 3.5  # training stops in time to test, analyse, package and sync to Drive before the Colab limit
+PILOT = BASE / 'run_dlv3p_msi_seed0_b8'  # run 2
+print(f'Máy Colab này đã chạy {(time.time() - T0) / 3600:.2f} giờ; huấn luyện dừng khi đủ {SESSION_HOURS} giờ.')
+''')
+
+md('''
+## 4. Chạy thử (chỉ ở phiên đầu, vài phút)
+
+Chạy 1 epoch chỉ 2 vòng lặp với learning rate giảm dần, rồi đánh giá cả mô hình tốt nhất lẫn mô hình epoch cuối, để bắt lỗi trước khi huấn luyện thật. Từ phiên thứ hai trở đi, mục này tự bỏ qua.
+''')
+code('''
 if not any((RUN / r['name'] / 'history.json').exists() for r in RUNS):
     shutil.rmtree('/content/smoke', ignore_errors=True)
-    run('src.weeds.train', '--data', DATA, '--out', '/content/smoke', '--smoke', '--batch', 8)
+    run('src.weeds.train', '--data', DATA, '--out', '/content/smoke', '--smoke', '--batch', 8, '--lr-schedule', 'cosine')
+    run('src.weeds.train', '--stage', 'test', '--weights', 'last', '--smoke', '--data', DATA, '--out', '/content/smoke')
 else:
     print('Đã có lần chạy bắt đầu từ phiên trước: bỏ qua chạy thử.')
 ''')
@@ -371,39 +384,60 @@ else:
 md('''
 ## 5. Huấn luyện, đánh giá và tầng quyết định cho từng lần chạy
 
-Mỗi epoch in một dòng như notebook thí nghiệm thử. Lần đã xong (có `go_no_go.json`) được bỏ qua. Khi một lần xong, checkpoint `last.pt` (khoảng 0,5 GB) được xóa để tiết kiệm Drive; mô hình tốt nhất `best.pt` được giữ lại.
+Mỗi epoch in một dòng như notebook thí nghiệm thử. Lần đã xong được bỏ qua. Khi một lần huấn luyện xong: đánh giá mô hình tốt nhất (`best.pt`, giữ lại) và mô hình epoch cuối (kết quả trong thư mục con `last/`), rồi xóa checkpoint `last.pt` (khoảng 0,5 GB).
 ''')
 code('''
+def evaluate_models(out):
+    """Test and decision layer for the model chosen on validation and for the final-epoch model (each step once)."""
+    if not (out / 'go_no_go.json').exists():
+        run('src.weeds.train', '--stage', 'test', '--data', DATA, '--out', out)
+        run('src.weeds.analyze', '--data', DATA, '--out', out)
+    if (out / 'last.pt').exists() and not (out / 'last' / 'go_no_go.json').exists():
+        run('src.weeds.train', '--stage', 'test', '--weights', 'last', '--data', DATA, '--out', out)
+        run('src.weeds.analyze', '--data', DATA, '--out', out / 'last')
+
+# run 2: only its final-epoch model is new (its checkpoint is kept: it belongs to the earlier notebook)
+if (PILOT / 'last.pt').exists() and not (PILOT / 'last' / 'go_no_go.json').exists():
+    print('========== lần chạy 2: mô hình epoch cuối ==========')
+    run('src.weeds.train', '--stage', 'test', '--weights', 'last', '--data', DATA, '--out', PILOT)
+    run('src.weeds.analyze', '--data', DATA, '--out', PILOT / 'last')
+
 for r in RUNS:
     out = RUN / r['name']
-    if (out / 'go_no_go.json').exists():
-        print(f"{r['name']}: đã xong, bỏ qua.")
-        continue
-    left = SESSION_HOURS - (time.time() - T0) / 3600
-    if left < 0.3:
-        print(f'Hết thời gian của phiên này (còn {left:.2f} giờ). Phiên sau: Run all lại, các lần đã xong tự bỏ qua.')
-        break
-    print(f"\\n========== {r['name']} | phiên còn {left:.2f} giờ ==========")
-    run('src.weeds.train', '--stage', 'train', '--data', DATA, '--out', out, *train_args(r),
-        '--budget-hours', f'{left - 0.15:.2f}')  # 0.15 h kept for test, decision layer and packaging
     if not (out / 'train_done.json').exists():
-        print(f"{r['name']}: chưa huấn luyện xong, sẽ chạy tiếp từ checkpoint ở phiên sau.")
-        break
-    run('src.weeds.train', '--stage', 'test', '--data', DATA, '--out', out)
-    run('src.weeds.analyze', '--data', DATA, '--out', out)
-    (out / 'last.pt').unlink(missing_ok=True)
+        left = SESSION_HOURS - (time.time() - T0) / 3600
+        if left < 0.3:
+            print(f'Hết thời gian của phiên này (còn {left:.2f} giờ). Phiên sau: Run all lại, các lần đã xong tự bỏ qua.')
+            break
+        print()
+        print(f"========== {r['name']} | phiên còn {left:.2f} giờ ==========")
+        run('src.weeds.train', '--stage', 'train', '--data', DATA, '--out', out, *train_args(r),
+            '--budget-hours', f'{left - 0.15:.2f}')  # 0.15 h kept for the two evaluations and packaging
+        if not (out / 'train_done.json').exists():
+            print(f"{r['name']}: chưa huấn luyện xong, sẽ chạy tiếp từ checkpoint ở phiên sau.")
+            break
+    evaluate_models(out)  # also completes a run whose evaluation an earlier session left unfinished
+    for f in ('last.pt', 'last.tmp'):
+        (out / f).unlink(missing_ok=True)
+    print(f"{r['name']}: xong.")
 ''')
 
 md('## 6. Tổng hợp các lần chạy đã xong (kèm lần chạy 2)')
 code('''
 import pandas as pd
 pd.set_option('display.width', 220)
-dirs = {'es_seed0 (lần chạy 2)': BASE / 'run_dlv3p_msi_seed0_b8', **{r['name']: RUN / r['name'] for r in RUNS}}
+dirs = {'es_seed0 (lần chạy 2)': PILOT, **{r['name']: RUN / r['name'] for r in RUNS}}
 df = summarize(dirs)
-print(df.round(3).to_string(index=False))
-print('\\nmIoU test theo lịch huấn luyện (bài báo: 82,90; mô hình công bố của tác giả qua code đề tài: 82,90):')
-print(by_schedule(df).round(2).to_string(index=False))
-df.to_csv(RUN / 'runs_summary.csv', index=False)
+if df.empty:
+    print('Chưa có lần chạy nào xong.')
+else:
+    print(df.round(3).to_string(index=False))
+    print()
+    print('mIoU test theo lịch huấn luyện và cách chọn mô hình (bài báo và mô hình công bố của tác giả: 82,90):')
+    print(by_schedule(df).round(2).to_string(index=False))
+    df.to_csv(RUN / 'runs_summary.csv', index=False)
+if df.attrs['skipped']:
+    print('Chưa có kết quả:', ', '.join(df.attrs['skipped']))
 ''')
 
 md('## 7. Đóng gói kết quả (chỉ file json và csv; mô hình và xác suất dự đoán ở lại trên Drive)')
@@ -414,7 +448,16 @@ with zipfile.ZipFile(ZIP_OUT, 'w', zipfile.ZIP_DEFLATED) as z:
     for f in sorted(RUN.rglob('*')):
         if f.suffix in ('.json', '.csv'):
             z.write(f, RESULTS / f.relative_to(RUN))
+    for f in sorted((PILOT / 'last').glob('*')):  # run 2's final-epoch model
+        if f.suffix in ('.json', '.csv'):
+            z.write(f, RESULTS / 'pilot_b8_seed0' / 'last' / f.name)
 print('Đã tạo', ZIP_OUT, f'({ZIP_OUT.stat().st_size / 1e6:.1f} MB)')
+''')
+
+md('## 8. Ghi hết dữ liệu lên Drive (chờ dòng "Đã ghi hết" rồi mới đóng phiên)')
+code('''
+drive.flush_and_unmount()  # checkpoints of 0.5 GB may still be syncing; the next session resumes from them
+print('Đã ghi hết dữ liệu lên Drive. Có thể đóng phiên Colab.')
 ''')
 
 md('''

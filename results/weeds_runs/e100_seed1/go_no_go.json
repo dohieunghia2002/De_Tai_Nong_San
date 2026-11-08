@@ -1,0 +1,46 @@
+{
+ "verdict": "GO",
+ "checks": {
+  "C1_test_miou": {
+   "value": 81.73546487356572,
+   "required": ">= 77.90",
+   "pass": true
+  },
+  "C2_spray_reduction": {
+   "value": 0.5046296296296297,
+   "required": ">= 0.3",
+   "pass": true
+  },
+  "C3_deferred": {
+   "value": 0.046296296296296294,
+   "required": "<= 0.3",
+   "pass": true
+  }
+ },
+ "info": {
+  "primary_setting": {
+   "cell_size": 200,
+   "tau": 0.01,
+   "policy": "conformal_3way",
+   "scope": "pre-herbicide pooled",
+   "calibration": "test 2-fold by location"
+  },
+  "alpha": 0.1,
+  "beta": 0.1,
+  "missed_need_rate": 0.046296296296296294,
+  "false_spray_rate": 0.037037037037037035,
+  "infestation": 0.5,
+  "oracle_spray_reduction": 0.5,
+  "c2_reachable": true,
+  "n_cal_need": 54,
+  "n_cal_no_need": 54,
+  "lam_lo": [
+   0.008439039634168147,
+   0.01023367276340723
+  ],
+  "lam_hi": [
+   0.007011989261209965,
+   0.007273026470839977
+  ]
+ }
+}

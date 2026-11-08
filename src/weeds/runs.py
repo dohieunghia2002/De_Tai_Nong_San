@@ -2,8 +2,11 @@
 whose released checkpoint our evaluation reproduces exactly (src.weeds.authors). The authors' training code differs
 from ours only in its schedule: 100 epochs without early stopping, checkpoints chosen on validation. So the runs
 measure seed variance under both schedules, plus one variant with a decaying learning rate. All use batch 8 and the
-5-band input. notebooks/colab_weeds_runs.ipynb trains them in the order below, as many as fit in a Colab session,
-evaluates each on test, runs the decision layer, and resumes the rest in the next session.
+5-band input. Each run is evaluated twice: with the model chosen on validation (best.pt), and with the final-epoch
+model, because choosing the best of many noisy validation scores may pick a lucky epoch (run 2: validation 83.94,
+test 79.25; the authors' released model: validation 79.53, test 82.90).
+notebooks/colab_weeds_runs.ipynb trains them in the order below, as many as fit in a Colab session, evaluates each,
+runs the decision layer, and resumes the rest in the next session.
 """
 import json
 from pathlib import Path
@@ -11,7 +14,6 @@ from pathlib import Path
 import pandas as pd
 
 from src.weeds.analyze import PRIMARY, pick
-from src.weeds.train import parser
 
 BATCH = 8
 RUNS = [  # in order of priority
@@ -25,6 +27,8 @@ RUNS = [  # in order of priority
     {'name': 'es_seed1', 'seed': 1, 'epochs': 200, 'patience': 30, 'lr_schedule': 'constant'},
     {'name': 'es_seed2', 'seed': 2, 'epochs': 200, 'patience': 30, 'lr_schedule': 'constant'},
 ]
+# what run 2 used: its train_done.json predates these fields (src.weeds.train defaults on 2026-11-04)
+LEGACY = {'epochs': 200, 'patience': 30, 'lr_schedule': 'constant'}
 
 
 def train_args(run):
@@ -33,37 +37,58 @@ def train_args(run):
             '--patience', str(run['patience']), '--lr-schedule', run['lr_schedule']]
 
 
+def fixed(run):
+    """True when early stopping can never fire before the last epoch."""
+    return run['patience'] >= run['epochs']
+
+
 def schedule(done):
-    """Schedule label from a train_done.json; runs written before these fields existed used the parser defaults."""
-    p = parser()
-    epochs, patience = done.get('epochs', p.get_default('epochs')), done.get('patience', p.get_default('patience'))
-    lr = done.get('lr_schedule', p.get_default('lr_schedule'))
-    if lr != 'constant':
-        return f'{epochs} epochs, {lr} lr'
-    return f'{epochs} epochs fixed' if patience >= epochs else f'early stopping ({patience})'
+    """Schedule label from a train_done.json (or a RUNS entry)."""
+    s = {**LEGACY, **{k: done[k] for k in LEGACY if k in done}}
+    if s['lr_schedule'] != 'constant':
+        return f"{s['epochs']} epochs, {s['lr_schedule']} lr"
+    return f"{s['epochs']} epochs fixed" if fixed(s) else f"early stopping ({s['patience']})"
+
+
+def decision_row(csv):
+    r = pick(pd.read_csv(csv), policy=PRIMARY['policy'],
+             **{k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')})
+    return {k: r[k] for k in ('spray_reduction', 'deferred', 'missed_need_rate', 'false_spray_rate')}
 
 
 def summarize(run_dirs):
-    """One row per finished run (train_done, segmentation_metrics, decision_metrics present): schedule, seed, best
-    epoch, validation and test mIoU, and the decisions of conformal_3way in the primary setting."""
-    rows = []
+    """One row per evaluated model of each finished run: 'best val' (best.pt) and, when <run>/last/ was evaluated,
+    'last epoch'. Columns: schedule, batch, seed, epoch of the model, validation and test mIoU, and the decisions of
+    conformal_3way in the primary setting. Runs without results are listed in df.attrs['skipped']."""
+    rows, skipped = [], []
     for name, d in run_dirs.items():
         d = Path(d)
-        files = [d / f for f in ('train_done.json', 'best.json', 'segmentation_metrics.json', 'decision_metrics.csv')]
-        if not all(f.exists() for f in files):
+        need = [d / f for f in ('train_done.json', 'best.json', 'segmentation_metrics.json', 'decision_metrics.csv')]
+        if not all(f.exists() for f in need):
+            skipped.append(name)
             continue
-        done, best, seg = (json.loads(f.read_text()) for f in files[:3])
-        r = pick(pd.read_csv(files[3]), policy=PRIMARY['policy'],
-                 **{k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')})
-        rows.append({'run': name, 'schedule': schedule(done), 'seed': done['seed'], 'epochs_run': done['epochs_run'],
-                     'best_epoch': best['epoch'], 'val_miou': best['val_miou'], 'test_miou': seg['test']['miou'],
-                     'test_crop': seg['test']['crop'], 'test_weed': seg['test']['weed'],
-                     'spray_reduction': r['spray_reduction'], 'deferred': r['deferred'],
-                     'missed_need_rate': r['missed_need_rate'], 'false_spray_rate': r['false_spray_rate']})
-    return pd.DataFrame(rows)
+        done, best = json.loads(need[0].read_text()), json.loads(need[1].read_text())
+        base = {'run': name, 'schedule': schedule(done), 'batch': done['batch'], 'seed': done['seed'],
+                'epochs_run': done['epochs_run']}
+        models = [('best val', best['epoch'], d)]
+        last = d / 'last'
+        if (last / 'segmentation_metrics.json').exists() and (last / 'decision_metrics.csv').exists():
+            models.append(('last epoch', json.loads((last / 'segmentation_metrics.json').read_text())['model']['epoch'],
+                           last))
+        for selection, epoch, m in models:
+            seg = json.loads((m / 'segmentation_metrics.json').read_text())
+            rows.append({**base, 'selection': selection, 'epoch': epoch, 'val_miou': seg['val']['miou'],
+                         'test_miou': seg['test']['miou'], 'test_crop': seg['test']['crop'],
+                         'test_weed': seg['test']['weed'], **decision_row(m / 'decision_metrics.csv')})
+    df = pd.DataFrame(rows)
+    df.attrs['skipped'] = skipped
+    return df
 
 
 def by_schedule(df):
-    """Count, mean, sample standard deviation (NaN for a single run) and range of test mIoU per schedule."""
-    return (df.groupby('schedule')['test_miou'].agg(n='count', mean='mean', std='std', min='min', max='max')
-            .reset_index())
+    """Count, mean, sample standard deviation (NaN for a single run) and range of test mIoU per schedule, batch
+    size and model selection."""
+    keys = ['schedule', 'batch', 'selection']
+    if df.empty:
+        return pd.DataFrame(columns=keys + ['n', 'mean', 'std', 'min', 'max'])
+    return df.groupby(keys)['test_miou'].agg(n='count', mean='mean', std='std', min='min', max='max').reset_index()

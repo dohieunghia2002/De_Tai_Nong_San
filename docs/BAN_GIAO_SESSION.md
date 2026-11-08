@@ -112,7 +112,7 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
 - `notebooks/colab_weeds_authors.ipynb` (sinh bởi cùng script): tải `ckpts.zip` lên Drive, đánh giá 4 mô hình của tác giả, chạy tầng quyết định trên 2 mô hình 3 lớp, rồi đóng gói thành `ket_qua_weeds_authors.zip`. Giải nén gói này vào `results/weeds_authors/`.
 - Trên runtime T4 chỉ cần bấm Run all; lỗi ở bước nào thì dừng ở bước đó.
 - `src/weeds/runs.py` định nghĩa các lần huấn luyện thêm và hàm tổng hợp; `train.py` có thêm `--lr-schedule cosine`, lưu trạng thái lịch learning rate trong checkpoint để chạy tiếp đúng; `train_done.json` ghi thêm epochs, patience, lr_schedule. `notebooks/colab_weeds_runs.ipynb` sinh bởi cùng script.
-- Có 34 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
+- Có 36 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
 
 ## 5. Kết quả thí nghiệm thử
 
@@ -171,7 +171,39 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
   - mIoU cao hơn không có nghĩa là quyết định tốt hơn. Mô hình tác giả hơn 3,65 điểm mIoU nhưng bỏ sót 4 ô so với 1 ô của mô hình đề tài. Tuy nhiên chênh lệch chỉ vài ô nên chưa kết luận được mô hình nào tốt hơn ở mức quyết định.
   - Hiệu chỉnh riêng từng ngày yếu như nhau với cả 3 mô hình (25/5 và 6/6 có 85–93% ô chưa quyết), nên đây là giới hạn của dữ liệu, không phải của mô hình.
 
-**Hạn chế:** mỗi cấu hình chỉ chạy một seed; tập test nhỏ (26 ô ảnh, 8 vị trí), nên các tỉ lệ bỏ sót và phun nhầm chỉ dựa trên 1–3 ô lưới; mIoU chỉ vượt ngưỡng C1 1,35 điểm.
+**Huấn luyện thêm** (`results/weeds_runs/`, đủ 6 lần chạy, Colab ngày 08/11/2026; batch 8, ảnh 5 dải; khoảng 17,3 giây mỗi epoch; tổng 3,26 giờ huấn luyện):
+
+| Lần chạy | mIoU test, mô hình val cao nhất (epoch) | mIoU test, mô hình epoch cuối (epoch) |
+|---|---|---|
+| 100 epoch cố định, seed 0 | 79,60 (99) | 79,60 (99) |
+| 100 epoch cố định, seed 1 | 81,74 (89) | 80,77 (99) |
+| 100 epoch cố định, seed 2 | 81,53 (86) | 83,26 (99) |
+| 100 epoch, lr cosine, seed 0 | 81,49 (99) | 81,49 (99) |
+| Dừng sớm, seed 0 (lần chạy 2, `results/weeds_pilot_b8/`) | 79,25 (149) | chưa đánh giá |
+| Dừng sớm, seed 1 | 81,20 (71) | **66,93** (101) |
+| Dừng sớm, seed 2 | **83,57** (133) | 83,74 (163) |
+
+- **Kết luận chính: khoảng cách 3,65 điểm là dao động ngẫu nhiên của quá trình huấn luyện, không phải code sai.**
+  - 7 mô hình chọn theo val có mIoU test 79,25–83,57, trung bình 81,20 (độ lệch chuẩn 1,44).
+  - `es_seed2` vượt bài báo (83,57 so với 82,90).
+- **Cùng seed vẫn ra kết quả khác:** GPU dùng thuật toán không tất định (`cudnn.benchmark`).
+  - Phiên 2 đã huấn luyện lại từ đầu cả 4 lần chạy 100 epoch đã xong ở phiên 1, không chạy tiếp; có thể do thư mục `runs` trên Drive không còn, ví dụ khi dùng tài khoản Google khác.
+  - Số của phiên 1 (chỉ còn ghi lại, file đã bị ghi đè khi giải nén zip mới) lệch so với phiên 2 từ −2,90 đến +3,89 điểm cho cùng seed:
+    - seed 0: 81,76 (phiên 1) so với 79,60 (phiên 2);
+    - seed 1: 77,85 so với 81,74;
+    - seed 2: 84,42 so với 81,53;
+    - cosine: 81,74 so với 81,49.
+  - Gộp cả 11 mô hình chọn theo val của hai phiên: trung bình 81,29, độ lệch chuẩn 1,86, khoảng 77,85–84,42; 2 mô hình đạt từ 82,90 trở lên.
+  - **Khi báo cáo chỉ dùng số của phiên 2**, vì phiên 1 không còn file.
+- **Chọn theo val an toàn hơn lấy epoch cuối.** Mô hình epoch cuối dao động mạnh hơn nhiều: độ lệch chuẩn 6,25, và `es_seed1` ở epoch cuối chỉ đạt 66,93 (IoU ngô 48,4). Giả thuyết "chọn val may mắn" bị bác bỏ. Learning rate cosine làm hai cách chọn trùng nhau.
+- **Dao động tập trung ở ngày 15/6** (2 ô ảnh sau khi phun): mIoU 55,3–80,5 giữa 12 mô hình. Các ngày khác: 25/5 63,3–72,6; 30/5 71,3–78,5; 6/6 75,6–85,9 (`test_by_date`).
+- **Tầng quyết định vững với cả 13 mô hình** (mIoU test 66,93–83,74, thiết lập chính):
+  - giảm thuốc 49,5–51,4%;
+  - chưa quyết 0–7,9%;
+  - bỏ sót tối đa 8,3%, phun nhầm tối đa 7,4%, cả hai đều dưới α = β = 10%.
+- Lần chạy 2 không có trên Drive của phiên Colab này, nên mô hình epoch cuối của nó chưa được đánh giá.
+
+**Hạn chế:** lịch 100 epoch và lịch dừng sớm mỗi lịch có 3 seed, lịch cosine chỉ có 1; kết quả huấn luyện không tất định, nên cần báo cáo theo phân bố, không theo một lần chạy; tập test nhỏ (26 ô ảnh, 8 vị trí), nên các tỉ lệ bỏ sót và phun nhầm chỉ dựa trên 1–3 ô lưới; mIoU chỉ vượt ngưỡng C1 1,35 điểm.
 
 ## 6. Việc tiếp theo
 
@@ -185,6 +217,20 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
      - Đã đối chiếu kỹ code huấn luyện của tác giả: loss, tăng cường ảnh, DataLoader, khởi tạo mô hình đều giống. Chỉ khác lịch huấn luyện, cách chọn checkpoint và fp32/A100. fp32 không thử vì batch 8 ở fp32 nhiều khả năng không vừa bộ nhớ T4.
      - Lần chạy 2: mIoU val tốt nhất trong 100 epoch đầu là 83,19 (epoch 94), cả quá trình là 83,94 (epoch 149). Như vậy chỉ rút về 100 epoch chưa chắc giúp ích.
    - Mô hình phân vùng chính trong báo cáo gửi thầy là mô hình công bố của tác giả; các lần tự huấn luyện là phép kiểm tra khả năng tái hiện.
+   - **Phát hiện khi review (06/11): có thể đang chọn mô hình "may mắn" trên val.**
+     - Mô hình của tác giả: val 79,53, test 82,90 (RGB: val 74,26, test 79,32).
+     - Lần chạy 2 thì ngược lại: val 83,94, test 79,25.
+     - Chọn epoch có val cao nhất trong 180 epoch dao động mạnh có thể chọn trúng một epoch may mắn trên val. Vì vậy mỗi lần chạy giờ được đánh giá thêm **mô hình ở epoch cuối** (`--stage test --weights last`, kết quả trong `<run>/last/`). Mô hình epoch cuối của lần chạy 2 cũng được đánh giá ở đầu notebook.
+     - `segmentation_metrics.json` có thêm `test_by_date` (mIoU test theo từng ngày bay) và `model` (mô hình nào, epoch nào).
+   - **Sửa sau review (06/11):**
+     - Đồng hồ phiên tính từ lúc máy Colab khởi động (`/proc/uptime`).
+     - Cuối notebook gọi `drive.flush_and_unmount()`.
+     - Chạy tiếp với thiết lập khác checkpoint thì báo lỗi.
+     - Trạng thái bộ sinh ngẫu nhiên được lưu trong `last.pt`.
+     - "patience" đếm lại khi `best.pt` mới hơn `last.pt`.
+     - Epoch cuối không bị tính là "hết giờ".
+     - `runs.py` không còn phụ thuộc giá trị mặc định của `train.py` (dùng `LEGACY`).
+     - Bảng tổng hợp có cột batch và cột cách chọn mô hình, và xử lý được trường hợp chưa có lần chạy nào xong.
    - **Báo cáo gửi thầy (đã soạn ngày 06/11, dùng mô hình của tác giả làm chính theo lựa chọn của người dùng):** https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs. Gồm tóm tắt, input/output kèm sơ đồ, dữ liệu, đối sánh, tầng quyết định kèm biểu đồ bỏ sót/phun nhầm, tính mới, hạn chế và kế hoạch, 6 điểm xin thầy chốt. Việc tiếp theo: người dùng gửi thầy và hẹn họp chốt.
 2. **Chờ thầy trả lời** ba điểm ở mục 1.4.
 3. **Đọc toàn văn các bài về ngưỡng phun** để thay τ minh họa bằng ngưỡng có nguồn.
