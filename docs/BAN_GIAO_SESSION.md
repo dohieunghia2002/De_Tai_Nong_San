@@ -1,4 +1,4 @@
-# Bàn giao giữa các phiên làm việc với Claude (cập nhật 05/11/2026)
+# Bàn giao giữa các phiên làm việc với Claude (cập nhật 10/11/2026)
 
 Đọc file này cùng `CLAUDE.md` trước khi làm tiếp. Mọi số liệu dưới đây lấy từ file kết quả thật, có ghi nguồn.
 
@@ -112,7 +112,9 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
 - `notebooks/colab_weeds_authors.ipynb` (sinh bởi cùng script): tải `ckpts.zip` lên Drive, đánh giá 4 mô hình của tác giả, chạy tầng quyết định trên 2 mô hình 3 lớp, rồi đóng gói thành `ket_qua_weeds_authors.zip`. Giải nén gói này vào `results/weeds_authors/`.
 - Trên runtime T4 chỉ cần bấm Run all; lỗi ở bước nào thì dừng ở bước đó.
 - `src/weeds/runs.py` định nghĩa các lần huấn luyện thêm và hàm tổng hợp; `train.py` có thêm `--lr-schedule cosine`, lưu trạng thái lịch learning rate trong checkpoint để chạy tiếp đúng; `train_done.json` ghi thêm epochs, patience, lr_schedule. `notebooks/colab_weeds_runs.ipynb` sinh bởi cùng script.
-- Có 36 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
+- `src/weeds/counterfactual.py`: giải thích phản thực ở mức quyết định, tính từ bản đồ xác suất, không chạy lại mô hình (xem mục 6, 2b).
+- `src/weeds/counterfactual_check.py`: cho mô hình kiểm chứng giải thích phản thực trên Colab; notebook `notebooks/colab_weeds_cfcheck.ipynb`.
+- Có 62 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Bộ mặc định chạy khoảng 2 phút; test chạy cả quy trình XAI chỉ chạy khi đặt `WEEDS_SLOW_TESTS=1`. Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
 
 ## 5. Kết quả thí nghiệm thử
 
@@ -205,6 +207,35 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
 
 **Hạn chế:** lịch 100 epoch và lịch dừng sớm mỗi lịch có 3 seed, lịch cosine chỉ có 1; kết quả huấn luyện không tất định, nên cần báo cáo theo phân bố, không theo một lần chạy; tập test nhỏ (26 ô ảnh, 8 vị trí), nên các tỉ lệ bỏ sót và phun nhầm chỉ dựa trên 1–3 ô lưới; mIoU chỉ vượt ngưỡng C1 1,35 điểm.
 
+**Giải thích quyết định (XAI)** (`results/weeds_xai/`, Colab ngày 09/11/2026; mô hình tác giả `dlv3p_msi_3`, fp16, IG 32 điểm, vùng che 20×20 điểm ảnh tức 5 cm × 5 cm, 10 lần ngẫu nhiên, seed 0; số liệu từ `xai_summary.json`, `xai_cells.csv`, `xai_deletion.csv`, `xai_maps.npz`):
+- **Các phép kiểm tra đều đạt:**
+  - quyết định tính lại khớp số đã báo cáo, chênh 0 (104 PHUN, 103 KHÔNG PHUN, 9 CHƯA CHẮC);
+  - điểm số chấm lại lệch tối đa 8·10⁻⁶, không ô nào đổi quyết định;
+  - ảnh "đất trống" có s gần 0 ở mọi ô (dưới 5·10⁻⁶);
+  - tính đầy đủ của IG: sai số tương đối trung vị 0,26% (riêng các ô PHUN/CHƯA CHẮC: 0,12%, tối đa 4,7%). Sai số tương đối lớn nhất (18%) rơi vào một ô KHÔNG PHUN có s chỉ 0,03%.
+- **Độ trung thực** (113 ô PHUN và CHƯA CHẮC; tỉ lệ đổi quyết định tính trên 104 ô PHUN). Tỉ lệ che tính theo 900 vùng của cả ô ảnh: 0,5% là 5 vùng, bằng 5% diện tích một ô lưới; 1% là 9 vùng; 2% là 18 vùng.
+
+| Cách chọn vùng che | Mức giảm s, che 0,5% / 1% / 2% | Ô PHUN bị đổi quyết định | Thắng che ngẫu nhiên trong ô |
+|---|---|---|---|
+| Integrated Gradients | 45,5% / 63,5% / 82,7% | 25,0% / 45,2% / 67,3% | 100% / 100% / 100% |
+| Grad-CAM | 5,3% / 9,3% / 17,2% | 1,9% / 3,8% / 9,6% | 38% / 45% / 54% |
+| Xác suất cỏ của mô hình (mốc) | 47,3% / 66,6% / 85,1% | 26,9% / 46,2% / 69,2% | 100% / 100% / 100% |
+| Ngẫu nhiên trong ô | 3,1% / 4,7% / 10,9% | 2,5% / 3,3% / 5,5% | – |
+| Ngẫu nhiên trên cả ô ảnh | 0,35% / 0,53% / 1,05% | 0,29% / 0,19% / 0,58% | – |
+
+- **Nhận xét:**
+  - **IG trung thực.** IG thắng cả hai đối chứng ngẫu nhiên ở 113/113 ô tại mọi mức che từ 0,5% đến 5%. Ở mức 10%, đối chứng "ngẫu nhiên trong ô" che 90/100 vùng của ô, gần như xóa cả ô, nên so sánh ở mức này không còn ý nghĩa (IG vẫn thắng 93,8% số ô).
+  - **Grad-CAM không trung thực ở mức ô lưới:** không hơn che ngẫu nhiên trong ô. Nguyên nhân: chỉ khoảng 10% phần dương của bản đồ Grad-CAM nằm trong ô đang quyết định, bằng đúng tỉ lệ diện tích 1/9, tức là bản đồ không định vị theo ô. Với IG, tỉ lệ này là 73% (ô PHUN) đến 88% (ô CHƯA CHẮC), tính theo trung vị. Đây là kết quả âm, nên báo cáo.
+    - Đã kiểm tra (10/11) rằng đây là bản chất của phương pháp, không phải lỗi code. Bản đồ Grad-CAM của các ô khác nhau trong cùng một ô ảnh gần như giống hệt nhau: hệ số tương quan trung bình theo ô ảnh có trung vị 0,965 (thấp nhất 0,817, 24 ô ảnh). Với IG, hệ số này là 0,002. Grad-CAM gộp gradient thành một trọng số cho mỗi kênh trên cả bản đồ đặc trưng, nên nó chỉ ra mọi chỗ "giống cỏ" trên ô ảnh.
+    - Claude đề xuất (10/11, chờ người dùng đồng ý): **không sửa Grad-CAM để chạy lại.** Code đúng công thức gốc; sửa sau khi đã thấy kết quả là chỉnh phương pháp cho đến khi qua được phép kiểm chứng. Nếu cần giải thích nguyên nhân trong bài viết, có thể thêm LayerCAM (Jiang và cộng sự 2021, *IEEE Transactions on Image Processing*), phương pháp giữ gradient theo từng vị trí, như một phương pháp thứ tư được khai báo rõ. Việc này cần chạy lại trên Colab, ưu tiên thấp.
+  - **IG không trung thực hơn mốc "xác suất cỏ"**: mốc giảm s nhiều hơn một chút ở mọi mức che, và IG chỉ hơn mốc ở 11–28% số ô. Điều này dễ hiểu, vì s chính là trung bình xác suất cỏ trong ô. Vì vậy bản đồ vùng trình bày cho người dùng có thể lấy thẳng từ xác suất cỏ; IG có thêm ba điều: chia đóng góp theo dải phổ, cho thấy 12–27% đóng góp dương nằm ngoài ô (ngữ cảnh xung quanh), và tổng đóng góp bằng đúng s − s(đất trống). Khi viết phải trình bày đúng như vậy.
+  - Theo ngày: mức giảm s khi che 1% tương tự nhau (60–71%), nhưng tỉ lệ đổi quyết định khác nhau: 25/5 100% (chỉ 2 ô), 30/5 77% (30 ô), 6/6 31% (72 ô). Nguyên nhân là ô ngày 6/6 nhiều cỏ (s trung vị 6,5%, so với ngưỡng khoảng 1%).
+- **Dải phổ:**
+  - Theo IG, **RE (red edge)** đóng góp lớn nhất ở 105/113 ô PHUN/CHƯA CHẮC. Trung vị tỉ lệ đóng góp: RE 70%, NIR 30%, R 9%, G −3%, B −10%.
+  - Phép thay từng dải bằng giá trị đất xếp RE đầu ở 68/113 ô (R 24, NIR 18). Dải đứng đầu trùng với IG ở 60% số ô.
+  - **Phép thay từng dải tạo phổ không có thật**: ở 57/103 ô KHÔNG PHUN, thay RE bằng giá trị đất đẩy s vượt 1%, tức mô hình "thấy cỏ" ở nơi không có. Vì vậy lời giải thích theo dải phổ nên dựa vào IG; phép thay dải chỉ dùng tham khảo.
+  - IG đo so với ảnh đất trống, nên trả lời câu hỏi "vì sao là cỏ mà không phải đất", **không** trả lời "vì sao là cỏ mà không phải ngô".
+
 ## 6. Việc tiếp theo
 
 1. **Đối sánh với bài báo** (thầy yêu cầu ngày 05/11), làm theo từng bước:
@@ -231,11 +262,99 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
      - Epoch cuối không bị tính là "hết giờ".
      - `runs.py` không còn phụ thuộc giá trị mặc định của `train.py` (dùng `LEGACY`).
      - Bảng tổng hợp có cột batch và cột cách chọn mô hình, và xử lý được trường hợp chưa có lần chạy nào xong.
-   - **Báo cáo gửi thầy (đã soạn ngày 06/11, dùng mô hình của tác giả làm chính theo lựa chọn của người dùng):** https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs. Gồm tóm tắt, input/output kèm sơ đồ, dữ liệu, đối sánh, tầng quyết định kèm biểu đồ bỏ sót/phun nhầm, tính mới, hạn chế và kế hoạch, 6 điểm xin thầy chốt. Việc tiếp theo: người dùng gửi thầy và hẹn họp chốt.
+   - **Báo cáo gửi thầy (đã soạn ngày 06/11, dùng mô hình của tác giả làm chính theo lựa chọn của người dùng):** https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs. Gồm tóm tắt, input/output kèm sơ đồ, dữ liệu, đối sánh, tầng quyết định kèm biểu đồ bỏ sót/phun nhầm, tính mới, hạn chế và kế hoạch, 6 điểm xin thầy chốt. Ngày 08/11 đã cập nhật báo cáo với kết quả 7 lần tự huấn luyện (thêm biểu đồ) và kết quả tầng quyết định trên 15 mô hình. Việc tiếp theo: người dùng gửi thầy và hẹn họp chốt.
 2. **Chờ thầy trả lời** ba điểm ở mục 1.4.
+2b. **XAI (người dùng yêu cầu làm ngay ngày 08/11, trước khi thầy chốt): đã chạy trên Colab ngày 09/11, kết quả và phân tích ở cuối mục 5.**
+   - Module `src/weeds/explain.py`, notebook `notebooks/colab_weeds_xai.ipynb`. Mô hình được giải thích là mô hình công bố của tác giả (`dlv3p_msi_3`), trên 216 ô của 24 ô ảnh test trước ngày phun.
+   - **Giải thích:**
+     - Integrated Gradients từ ảnh "đất trống" (trung vị các điểm ảnh nền của tập train, từng dải), 32 điểm trên đường tích phân; tổng đóng góp phải bằng s(ảnh) − s(đất trống).
+     - Grad-CAM trên đặc trưng của bộ giải mã.
+     - Bản đồ xác suất cỏ của mô hình, dùng làm mốc so sánh.
+     - Mức quan trọng của từng dải phổ, đo bằng cách thay từng dải bằng giá trị đất.
+   - **Kiểm chứng độ trung thực** (chỉ cho các ô PHUN và CHƯA CHẮC):
+     - xóa (thay bằng đất) 0,5–10% số vùng 20×20 điểm ảnh mà mỗi phương pháp xếp cao nhất;
+     - so với xóa cùng số vùng ngẫu nhiên trên cả ô ảnh và ngay trong ô lưới (10 lần mỗi loại);
+     - chỉ số: mức giảm tương đối của s, tỉ lệ thắng đối chứng ngẫu nhiên, tỉ lệ ô PHUN bị đổi quyết định.
+   - Kết quả lưu theo từng ô ảnh trong `parts/`, nên chạy tiếp được nếu bị ngắt. Gói kết quả: `ket_qua_weeds_xai.zip`, giải nén vào `results/weeds_xai/`. Riêng `xai_maps.npz` (khoảng 20 MB) đã bị gitignore.
+   - **Đã review và sửa (08/11):**
+     - Gradient lấy theo **tổng** xác suất cỏ trong ô rồi chia lại, vì trung bình trên 40.000 điểm ảnh tràn về 0 ở fp16; có tùy chọn `--no-amp`.
+     - Bản đồ lưu ở fp32.
+     - Mốc "xác suất cỏ" chỉ tính trong ô.
+     - Quyết định tính một lần (`decisions.csv`) và đối chiếu với `results/weeds_authors/dlv3p_msi_3/go_no_go.json`, giá trị này được nhúng vào notebook.
+     - Thiết lập cố định theo thư mục (`xai_config.json`, `XAI_VERSION`).
+     - Tỉ lệ đổi quyết định tính theo điểm số chấm lại.
+     - Kiểm tra lưới che vùng.
+     - Phép che ngẫu nhiên trên cả ô ảnh dùng chung cho mọi ô.
+     - `DeepLabV3Plus.features/head` nằm trong lớp mô hình.
+     - Hàm dùng chung `analyze.primary_decisions` (cả `make_pipeline_figure.py` cũng dùng). Hàm này ra đúng quyết định đã báo cáo cho mô hình tác giả: 104 PHUN, 103 KHÔNG PHUN, 9 CHƯA CHẮC, chênh 0. Như vậy có 113 ô được kiểm chứng độ trung thực.
+     - Kết quả lần 2 và của mô hình tác giả tính lại khớp hoàn toàn với file đã lưu.
+   - **Phân tích độ trung thực: đã xong ngày 10/11** (cuối mục 5).
+   - **Hướng mới, người dùng đồng ý ngày 10/11: giải thích phản thực (counterfactual) ở mức quyết định** (Wachter và cộng sự 2018, *Harvard Journal of Law & Technology*). Ví dụ: "bỏ k đám cỏ 5 cm × 5 cm này thì ô không còn PHUN"; "ô CHƯA CHẮC cách ngưỡng phun Z cm² cỏ"; "ô KHÔNG PHUN cần thêm V cm² cỏ mới phải phun". Lý do chọn:
+     - quyết định chỉ là ngưỡng trên s, nên câu hỏi người vận hành cần trả lời là "đổi gì thì quyết định đổi";
+     - thay cỏ bằng đất là thay đổi có thật ngoài ruộng;
+     - nếu tính được từ bản đồ xác suất thì giải thích có ngay, phù hợp yêu cầu thời gian thực.
+     IG giữ lại cho phần dải phổ, Grad-CAM giữ làm đối chứng âm. **Chưa tra cứu tài liệu, chưa được nói là mới.**
+   - **Bước 1 (10/11, chạy trên máy, chỉ đọc file): ước lượng phản thực từ bản đồ xác suất có khớp với mô hình không.**
+     - Cách làm: ước lượng s sau khi xóa bằng phép trừ, s − (tổng xác suất cỏ của các vùng bị xóa)/200². So với s do mô hình tính lại trong `xai_deletion.csv`, phương pháp `predicted_weed`, vì phương pháp này xóa đúng các vùng có xác suất cỏ cao nhất trong ô. Dùng `results/weeds_authors/dlv3p_msi_3/probs_test.npz`, file bị gitignore và chỉ có trên máy.
+     - Kết quả trên 113 ô × 5 mức che:
+       - quyết định sau khi xóa trùng với mô hình ở 545/565 trường hợp (96,5%);
+       - với ô PHUN, dự đoán "còn phun hay không" trùng ở 97,3%;
+       - sai số trung vị khoảng 1–3,5 cm² cỏ dự đoán (s × 2500 cm²), phân vị 95% tối đa 13,6 cm², trong khi ngưỡng phun tương đương 28–33 cm².
+     - **Ước lượng lệch có hệ thống về một phía:** nó đánh giá mức giảm s cao hơn mô hình khoảng 1–6% (trung vị theo mức che). 18/20 trường hợp lệch là ước lượng cho rằng ô đã hết PHUN trong khi mô hình vẫn PHUN hoặc CHƯA CHẮC. Các trường hợp lệch đều nằm sát ngưỡng.
+     - Kết luận: ước lượng dùng được để hiển thị ngay, nhưng số vùng tối thiểu k có thể thiếu ở ô sát ngưỡng. Bản dùng trong luận văn nên được mô hình kiểm chứng lại, mỗi ô vài lần chạy xuôi trên Colab, bắt đầu từ k ước lượng.
+   - **Bước 2 (10/11, chạy trên máy): giải thích phản thực ước lượng cho cả 216 ô.**
+     - Module `src/weeds/counterfactual.py` (chỉ dùng numpy và pandas) và 8 test trong `tests/test_weeds_counterfactual.py`.
+     - Lệnh chạy: `python -m src.weeds.counterfactual --probs results/weeds_authors/dlv3p_msi_3/probs_test.npz --decisions results/weeds_xai/decisions.csv --deletion results/weeds_xai/xai_deletion.csv --out results/weeds_counterfactual`.
+     - Kết quả nằm trong `results/weeds_counterfactual/`, gồm `counterfactual_cells.csv` (từng ô, kèm danh sách vùng cần bỏ) và `counterfactual_summary.json`. Phần đối chiếu với mô hình tái hiện đúng số của bước 1.
+     - Diện tích tính là diện tích cỏ dự đoán, tức tổng xác suất cỏ nhân diện tích điểm ảnh 0,0625 cm². Mỗi vùng 5 cm × 5 cm rộng 25 cm².
+     - **104 ô PHUN:** số vùng tối thiểu phải bỏ để hết PHUN có trung vị 9 (nhỏ nhất 1, tứ phân vị 4,75–21, lớn nhất 48). Diện tích cỏ dự đoán trong các vùng đó có trung vị 72,5 cm² (4,5–651).
+       - Có 11 ô chỉ cần bỏ 1 vùng, 18 ô bỏ tối đa 2 vùng, 26 ô bỏ tối đa 4 vùng. Đây là các quyết định "mong manh", cũng là chỗ ước lượng dễ lệch nhất; bước 3 cần kiểm chứng kỹ các ô này.
+       - Trung vị theo ngày: 25/5 là 3 vùng (2 ô), 30/5 là 4,5 vùng, 6/6 là 13 vùng.
+     - **9 ô CHƯA CHẮC:**
+       - thêm 2,6–7,8 cm² cỏ (trung vị 5,3) thì ô sẽ PHUN;
+       - bớt 0,2–5,6 cm² (trung vị 2,0) thì KHÔNG PHUN;
+       - bỏ 1 vùng là đủ (1 ô cần 2 vùng).
+       Như vậy mỗi ô CHƯA CHẮC chỉ cách quyết định khoảng một vùng 5 cm. Danh sách vùng cho người kiểm tra biết chính xác cần ra xem chỗ nào.
+     - **103 ô KHÔNG PHUN:** cần thêm 3,5–32,6 cm² cỏ (trung vị 21,8) mới phải phun. Phía thêm cỏ chỉ tính theo quy tắc, không kiểm chứng bằng mô hình được.
+     - Thời gian: 216 ô mất 0,09 giây trên laptop (0,42 ms mỗi ô), không cần GPU, không cần chạy lại mô hình. Thời gian của IG chưa đo.
+   - **Review bước 1 và 2 (10/11, người dùng yêu cầu): thuật toán đúng, kết quả giữ nguyên.**
+     - Kiểm tra độc lập từ điểm ảnh, bằng vòng lặp và mặt nạ điểm ảnh thay cho cách tính của module, trên cả 216 ô: 0 lỗi. Cụ thể:
+       - các vùng liệt kê nằm trong đúng ô và là các vùng có nhiều cỏ dự đoán nhất;
+       - bỏ k vùng thì đổi quyết định; không tập k − 1 vùng nào trên lưới cố định làm đổi được;
+       - các mức "thêm/bớt cm²" đúng là ranh giới của quy tắc;
+       - diện tích tính đúng.
+     - s tính từ bản đồ trùng với `decisions.csv` (lệch 1·10⁻¹⁶). Thứ tự đánh số ô khớp với `analyze.primary_decisions`.
+     - Kích thước điểm ảnh 2,5 mm khớp với Bảng 1 của bài báo gốc (GSD 2,5).
+     - Bước 1 (script tạm) và phần đối chiếu của bước 2 (module) là hai cách viết độc lập và ra cùng số.
+     - Đã sửa nhỏ, không đổi kết quả:
+       - cách tính số vùng che viết giống hệt `explain.py`;
+       - bỏ cách dùng NaN làm khóa của dict;
+       - ghi rõ phạm vi trong docstring (lưới cố định, chỉ bỏ vùng trong ô, chỉ đối chiếu ở 5 mức che).
+     - Thêm chỉ số: bỏ 155 trường hợp cả hai cách đều không đổi quyết định (trùng hiển nhiên), còn 410 trường hợp, trùng 95,1%. **Nên báo cáo con số 95,1% cùng với 96,5%.** Các trường hợp không độc lập, vì 113 ô × 5 mức che.
+     - Còn lại, không phải lỗi:
+       - phép đối chiếu chỉ ở 5 mức che cố định, chưa ở đúng k của từng ô (vì vậy cần bước 3);
+       - bản đồ lưu ở float16 có thể xếp hạng khác bản fp32 trên Colab khi hai vùng gần bằng nhau, nhưng khi đó ước lượng chỉ thay đổi tối đa bằng hiệu khối lượng giữa hai vùng.
+   - **Bước 3 (10/11): code và notebook đã sẵn sàng, chưa chạy.**
+     - Module `src/weeds/counterfactual_check.py` (GPU) và 6 test trong `tests/test_weeds_counterfactual_check.py` (CPU, khoảng 25 giây). Notebook: `notebooks/colab_weeds_cfcheck.ipynb`, sinh bởi `scripts/make_weeds_notebook.py`.
+     - **Cách làm:** với mỗi ô PHUN/CHƯA CHẮC (113 ô), xếp hạng các vùng 5 cm trong ô theo xác suất cỏ của mô hình (fp32, như mốc `predicted_weed`). Lần lượt thay 1, 2, 3, ... vùng bằng đất rồi cho mô hình chấm lại. Dừng khi mô hình đã cho KHÔNG PHUN và k đã vượt cả hai số ước lượng thêm 2 vùng (`--extra`), hoặc khi đã bỏ hết 100 vùng của ô.
+     - **Ghi lại:**
+       - k theo mô hình (hết PHUN, thành KHÔNG PHUN) cạnh k ước lượng. k theo mô hình là vùng thứ mấy trong đúng thứ tự mà lời giải thích chỉ ra, nên nó kiểm chứng câu "bỏ k vùng này thì ô hết phun". **Nó không phải số vùng ít nhất đối với mô hình**: vì mô hình nhìn cả vùng xung quanh, một tập vùng khác có thể làm đổi quyết định với ít vùng hơn. Khi viết phải trình bày đúng như vậy;
+       - đường cong s của mô hình và của ước lượng ở mọi k đã quét;
+       - quyết định có đổi ngược lại khi bỏ thêm vùng không (`reverts_*`);
+       - mức tăng s lớn nhất giữa hai bước liên tiếp.
+     - **Đầu vào:** `decisions.csv` và `soil_baseline.json` của `results/weeds_xai` được nhúng vào notebook lúc sinh, để kiểm chứng đúng các quyết định đã phân tích. Notebook chỉ cần tập test.
+     - **Khối lượng:** khoảng 2.200 lần chạy mô hình nếu mô hình khớp ước lượng, bằng khoảng 1/4 phép che của notebook XAI (khoảng 8.200 lần). Mục 5 chạy thử 1 ô ảnh và in thời gian ước tính, là cận dưới.
+     - Kết quả: `ket_qua_weeds_cfcheck.zip` (csv và json), giải nén vào `results/weeds_cfcheck/`. Sau khi có kết quả, đối chiếu thêm k ước lượng trên Colab (bản đồ fp32) với k trong `results/weeds_counterfactual/` (bản đồ float16 lưu trên máy).
+     - **Review (10/11, người dùng yêu cầu):** thuật toán quét đúng. Đã sửa:
+       - câu chữ về ý nghĩa của k (xem trên);
+       - thiết lập lưu cho thư mục kết quả nay ghi cả mã băm của `decisions.csv` và giá trị đất, để không trộn kết quả của đầu vào khác;
+       - mô tả thời gian ước tính.
+       Thêm test kiểm chứng độc lập với mạng DeepLab ngẫu nhiên: tự xếp hạng vùng và chấm từng ảnh một cho mọi k. Điểm số trong test này tăng ở 8/16 bước, quyết định đổi rồi đổi ngược lại; thứ tự vùng, điểm số, k và cờ đổi ngược đều khớp với phép quét theo lô.
+     - Test với mô hình giả theo từng điểm ảnh: ước lượng khớp mô hình, k tính tay đúng, điều kiện dừng đúng. Riêng ô toàn đất có ngưỡng rất nhỏ thì ước lượng đạt KHÔNG PHUN còn mô hình thì không, vì ước lượng coi đất có xác suất cỏ bằng 0. Đây đúng là loại sai lệch cần đo.
+   - **Việc tiếp theo:** vẽ hình giải thích cho vài ô tiêu biểu (vùng lấy từ xác suất cỏ hoặc IG, dải phổ lấy từ IG); viết lời giải thích bằng chữ cho từng ô (quy tắc, vùng, dải phổ); bổ sung vào báo cáo gửi thầy, kể cả kết quả âm của Grad-CAM.
 3. **Đọc toàn văn các bài về ngưỡng phun** để thay τ minh họa bằng ngưỡng có nguồn.
 4. **Thiết kế cách hiệu chỉnh lại khi sang đợt bay mới:** hiệu chỉnh riêng từng ngày hiện có quá ít mẫu.
-5. **Làm mô-đun giải thích (XAI)** và phép kiểm chứng độ trung thực (che vùng, có đối chứng ngẫu nhiên).
+5. **Mô-đun giải thích (XAI)** và phép kiểm chứng độ trung thực: đã chạy (mục 2b). Còn lại phần hình, lời giải thích bằng chữ và đưa vào báo cáo.
 
 ## 7. Lưu ý về cách làm việc
 

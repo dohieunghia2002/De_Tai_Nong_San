@@ -58,10 +58,15 @@ class DeepLabV3Plus(nn.Module):
                 nn.init.ones_(m.weight)
                 nn.init.zeros_(m.bias)
 
-    def forward(self, x):
-        size = x.shape[-2:]
+    def features(self, x):
+        """Decoder features that feed the classifier (stride 4); Grad-CAM (src.weeds.explain) works on them."""
         low = self.layer1(self.stem(x))
         high = self.layer4(self.layer3(self.layer2(low)))
         out = F.interpolate(self.aspp(high), size=low.shape[-2:], mode='bilinear', align_corners=False)
-        out = self.classifier(torch.cat([self.low_proj(low), out], dim=1))
-        return F.interpolate(out, size=size, mode='bilinear', align_corners=False)
+        return torch.cat([self.low_proj(low), out], dim=1)
+
+    def head(self, feat, size):
+        return F.interpolate(self.classifier(feat), size=size, mode='bilinear', align_corners=False)
+
+    def forward(self, x):
+        return self.head(self.features(x), x.shape[-2:])

@@ -17,11 +17,12 @@ import pandas as pd
 
 from src.weeds.data import (DATES, EXPECTED_TEST_LOCATIONS, PAPER_TEST_3CLASS_MSI, PRE_HERBICIDE_DATES,
                             load_npz, location_blocks, to_3class)
-from src.weeds.decision import cell_table, evaluate_crossfit, evaluate_policies
+from src.weeds.decision import cell_table, crossfit_decisions, evaluate_crossfit, evaluate_policies
 
 CELL_SIZES = (100, 200)                # 0.25 m and 0.5 m cells at 2.5 mm GSD
 TAUS = (0.001, 0.005, 0.01, 0.02)      # illustrative weed-cover fractions that make a cell need spraying
 ALPHA = BETA = 0.1
+SCOPES = {'pre-herbicide pooled': PRE_HERBICIDE_DATES, **{d: (d,) for d in DATES}}  # name -> acquisition dates
 CAL_TEST_2FOLD = 'test 2-fold by location'
 CAL_VAL = 'val (also used for model selection)'
 PRIMARY = {'cell_size': 200, 'tau': 0.01, 'policy': 'conformal_3way', 'scope': 'pre-herbicide pooled',
@@ -50,14 +51,28 @@ def test_location_folds(test_ids):
     return {t: i % 2 for i, b in enumerate(blocks) for t in b}
 
 
+def primary_decisions(test_cells, fold_of):
+    """Per-cell decisions of the primary setting: the test cells (cell_table rows at PRIMARY['cell_size']) of
+    PRIMARY['scope'], each with its fold, the decision of PRIMARY['policy'], the thresholds applied to it from the
+    2-fold cross-fit by location, and its index within the tile ('cell', row-major). fold_of: test_location_folds."""
+    if PRIMARY['calibration'] != CAL_TEST_2FOLD or set(test_cells['cell_size']) != {PRIMARY['cell_size']}:
+        raise ValueError('primary_decisions expects test cells of the primary cell size, cross-fit calibration')
+    t = test_cells[test_cells['date'].isin(SCOPES[PRIMARY['scope']])].copy()
+    t['fold'] = t['tile'].map(fold_of).to_numpy()
+    policies, per_row, _ = crossfit_decisions(t, t['fold'].to_numpy(), PRIMARY['tau'], ALPHA, BETA)
+    t['decision'] = policies[PRIMARY['policy']]
+    t['lam_lo'], t['lam_hi'] = per_row['lam_lo'], per_row['lam_hi']
+    t['cell'] = t.groupby('tile').cumcount()
+    return t.reset_index(drop=True)
+
+
 def run(data_dir, out_dir):
     rows = []
-    scopes = [('pre-herbicide pooled', PRE_HERBICIDE_DATES)] + [(d, (d,)) for d in DATES]
     for cell in CELL_SIZES:
         val_all, test_all = load_cells(data_dir, out_dir, 'val', cell), load_cells(data_dir, out_dir, 'test', cell)
         fold_of = test_location_folds(list(dict.fromkeys(test_all['tile'])))
         for tau in TAUS:
-            for scope, dates in scopes:
+            for scope, dates in SCOPES.items():
                 t = test_all[test_all['date'].isin(dates)]
                 if t.empty:
                     continue

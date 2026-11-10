@@ -3,6 +3,8 @@ to GitHub. Rerun after any change in src/weeds:  python scripts/make_weeds_noteb
   notebooks/colab_weeds_pilot.ipynb    train DeepLabv3+, evaluate, decision layer (pilot runs)
   notebooks/colab_weeds_authors.ipynb  evaluate the authors' released checkpoints, decision layer on their model
   notebooks/colab_weeds_runs.ipynb     further training runs (seeds, schedules) of src/weeds/runs.py
+  notebooks/colab_weeds_xai.ipynb      explanations of the spraying decisions and their faithfulness (src/weeds/explain.py)
+  notebooks/colab_weeds_cfcheck.ipynb  model check of the counterfactual explanations (src/weeds/counterfactual_check.py)
 """
 import json
 import sys
@@ -10,7 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = ['src/__init__.py'] + [f'src/weeds/{m}.py' for m in ('__init__', 'data', 'model', 'train', 'decision',
-                                                                 'analyze', 'authors', 'runs')]
+                                                                 'analyze', 'authors', 'runs', 'explain',
+                                                                 'counterfactual', 'counterfactual_check')]
 ZIP_URL = 'https://doidata.gfz.de/weedsgalore_e_celikkan_2024/weedsgalore-dataset.zip'
 ZIP_BYTES = 336989804  # size served by GFZ on 2026-10-29
 
@@ -465,3 +468,281 @@ md('''
 ''')
 
 write_notebook('colab_weeds_runs.ipynb')
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Explanations (XAI) of the spraying decisions and their faithfulness (src/weeds/explain.py)
+# ---------------------------------------------------------------------------------------------------------------------
+# decisions and thresholds reported for the authors' 5-band model, so that the notebook checks it explains those
+EXPECTED_FILE = ROOT / 'results' / 'weeds_authors' / 'dlv3p_msi_3' / 'go_no_go.json'
+EXPECTED = EXPECTED_FILE.read_text(encoding='utf-8') if EXPECTED_FILE.exists() else None
+
+md('''
+# Giải thích quyết định phun thuốc (XAI) và kiểm chứng độ trung thực của lời giải thích
+
+Mô hình được giải thích: mô hình công bố của tác giả (DeepLabv3+, ảnh 5 dải, 3 lớp; mIoU test 82,90 như bài báo), là mô hình phân vùng chính của đề tài. Các ô được giải thích: 216 ô lưới 0,5 m của 24 ô ảnh test thuộc 3 đợt bay trước khi phun thuốc, với quyết định phun / không phun / chưa chắc ở thiết lập chính.
+
+Quyết định của một ô chỉ phụ thuộc vào điểm số s = trung bình xác suất cỏ trong ô, nên giải thích quyết định là chỉ ra **điểm ảnh nào và dải phổ nào** làm s cao lên:
+- **Integrated Gradients**, so với ảnh "đất trống" (mỗi dải lấy giá trị trung vị của các điểm ảnh nền đất trong tập train): cho mức đóng góp của từng điểm ảnh và từng dải; tổng đóng góp phải bằng s(ảnh) − s(đất trống).
+- **Grad-CAM** trên đặc trưng của bộ giải mã.
+- **Bản đồ xác suất cỏ** của chính mô hình, làm mốc so sánh.
+- **Mức quan trọng của từng dải phổ:** thay một dải bằng giá trị đất trên cả ô ảnh, xem s giảm bao nhiêu.
+
+**Kiểm chứng độ trung thực** (với các ô PHUN và CHƯA CHẮC): thay các vùng 5 cm × 5 cm mà lời giải thích xếp cao nhất bằng đất (0,5% đến 10% số vùng của ô ảnh), đo s giảm bao nhiêu và quyết định PHUN có đổi không. Đối chứng: thay cùng số vùng **chọn ngẫu nhiên** trên cả ô ảnh, và ngẫu nhiên **ngay trong ô lưới** (10 lần mỗi loại). Lời giải thích trung thực phải làm s giảm mạnh hơn đối chứng ngẫu nhiên.
+
+Quyết định của các ô được tính một lần ở phiên đầu và đối chiếu với kết quả đã báo cáo cho mô hình này (`results/weeds_authors`); nếu lệch, notebook in dòng `WARNING`.
+
+Thời gian ước tính: khoảng 30–45 phút GPU (mục 5 in dòng `estimated full run` sau khi chạy thử 1 ô ảnh). Kết quả lưu theo từng ô ảnh, nên nếu bị ngắt thì Run all lại sẽ chạy tiếp.
+
+**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mục 8 tạo `ket_qua_weeds_xai.zip` (khoảng 30–40 MB, có bản đồ giải thích thu nhỏ) khi đã chạy xong.
+''')
+
+md('## 1. Kết nối Drive và ghi mã nguồn (chạy ở **mọi** phiên)')
+code(setup_code('''
+RUN = BASE / 'xai_authors_msi3'  # explanations of the authors' 5-band, 3-class model
+RESULTS = Path('results/weeds_xai')  # folder inside the downloaded zip
+CKPT_ZIP = BASE / 'authors_ckpts' / 'ckpts.zip'  # shared with colab_weeds_authors.ipynb
+''', "print('Thư mục kết quả:', RUN)"))
+
+md('## 2. Phần A: tải và chuẩn bị dữ liệu (bỏ qua nếu đã có)')
+code(DATA_CODE)
+
+md('## 3. Phần A: tải mô hình của tác giả lên Drive (887 MB, bỏ qua nếu đã có)')
+code('''
+from src.weeds.authors import CKPT_URL, CKPT_ZIP_BYTES
+
+CKPT_ZIP.parent.mkdir(parents=True, exist_ok=True)
+if not CKPT_ZIP.exists() or CKPT_ZIP.stat().st_size != CKPT_ZIP_BYTES:
+    subprocess.run(['curl', '-L', '--retry', '3', '-o', str(CKPT_ZIP), CKPT_URL], check=True)
+assert CKPT_ZIP.stat().st_size == CKPT_ZIP_BYTES, f'Kích thước ckpts.zip không đúng: {CKPT_ZIP.stat().st_size}'
+print('ckpts.zip đã có trên Drive:', CKPT_ZIP)
+''')
+
+md('''
+## 4. Phần B: kiểm tra GPU, chép dữ liệu và mô hình về máy Colab
+
+Trước mục này: *Runtime → Change runtime type → T4 GPU*, rồi chạy lại mục 1.
+''')
+code(gpu_code(('train', 'test')))
+code('''
+import time, zipfile
+CKPT = Path('/content/ckpts/dlv3p_msi_3.pth')
+CKPT.parent.mkdir(exist_ok=True)
+with zipfile.ZipFile(CKPT_ZIP) as z:
+    member = 'ckpts/dlv3p_msi_3.pth'
+    if not CKPT.exists() or CKPT.stat().st_size != z.getinfo(member).file_size:
+        tmp = CKPT.with_suffix('.tmp')
+        tmp.write_bytes(z.read(member))
+        tmp.replace(CKPT)
+# the session clock counts from the start of this Colab VM, so running the notebook again on it does not reset it
+T0 = time.time() - float(Path('/proc/uptime').read_text().split()[0])
+SESSION_HOURS = 3.5
+print(CKPT, f'{CKPT.stat().st_size / 1e6:.0f} MB | máy Colab đã chạy {(time.time() - T0) / 3600:.2f} giờ')
+''' + (f'''
+EXPECT = Path('/content/expected_go_no_go.json')  # what results/weeds_authors reported for this model
+EXPECT.write_text({EXPECTED!r})
+EXPECT_ARGS = ['--expect', EXPECT]
+''' if EXPECTED else '''
+EXPECT_ARGS = []  # no reported results were available when this notebook was generated
+'''))
+
+md('''
+## 5. Chạy thử trên 1 ô ảnh (vài phút, chỉ ở phiên đầu)
+
+Bắt lỗi và đo thời gian cho 1 ô ảnh với thiết lập đầy đủ. Dòng `estimated full run` cho biết thời gian ước tính của mục 6; dòng `completeness` phải có sai số nhỏ (cỡ 1e-4 trở xuống). Nếu báo lỗi hết bộ nhớ (out of memory) hoặc có dòng `WARNING`, dừng lại và báo cho Claude.
+''')
+code('''
+if (RUN / 'parts').exists() and any((RUN / 'parts').iterdir()):
+    print('Đã có kết quả từ phiên trước: bỏ qua chạy thử.')
+else:
+    shutil.rmtree('/content/xai_smoke', ignore_errors=True)
+    run('src.weeds.explain', '--data', DATA, '--ckpt', CKPT, '--out', '/content/xai_smoke', '--limit-tiles', 1,
+        *EXPECT_ARGS)
+''')
+
+md('## 6. Giải thích toàn bộ 216 ô lưới và kiểm chứng độ trung thực (chạy tiếp được nếu bị ngắt)')
+code('''
+left = SESSION_HOURS - (time.time() - T0) / 3600
+if left < 0.3:
+    print(f'Phiên này gần hết giờ (còn {left:.2f} giờ): mở phiên mới rồi Run all lại.')
+else:
+    run('src.weeds.explain', '--data', DATA, '--ckpt', CKPT, '--out', RUN, '--budget-hours', f'{left - 0.2:.2f}',
+        *EXPECT_ARGS)
+if not (RUN / 'xai_summary.json').exists():
+    print('Chưa xong: ở phiên sau Run all lại, các ô ảnh đã xong được giữ lại.')
+''')
+
+md('''
+## 7. Kết quả kiểm chứng độ trung thực
+
+`mean_rel_drop`: s giảm trung bình bao nhiêu phần (so với s ban đầu) khi xóa các vùng được xếp cao nhất. `beats_random_*`: tỉ lệ ô mà lời giải thích làm s giảm nhiều hơn đối chứng ngẫu nhiên. `spray_flip_rate`: tỉ lệ ô PHUN không còn là PHUN sau khi xóa.
+''')
+code('''
+import pandas as pd
+summary = json.loads((RUN / 'xai_summary.json').read_text()) if (RUN / 'xai_summary.json').exists() else None
+if summary:
+    check = summary['decision_check'] or {}
+    print('Quyết định:', summary['decisions'], '| lệch so với kết quả đã báo cáo:', check.get('max_abs_diff'),
+          '| ô đổi quyết định khi chấm lại:', summary['rescored_decision_differs'])
+    print('Sai số tổng Integrated Gradients:', summary['ig_completeness_abs_error'])
+    rows = [{'method': m, 'fraction': float(f), **v} for m, by_f in summary['faithfulness'].items() for f, v in by_f.items()]
+    print(pd.DataFrame(rows).round(3).to_string(index=False))
+''')
+
+md('## 8. Đóng gói kết quả (chỉ khi đã chạy xong)')
+code('''
+ZIP_OUT = BASE / 'ket_qua_weeds_xai.zip'
+if (RUN / 'xai_summary.json').exists():
+    with zipfile.ZipFile(ZIP_OUT, 'w', zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(RUN.glob('*')):
+            if f.suffix in ('.json', '.csv', '.npz'):
+                z.write(f, RESULTS / f.name)
+    print('Đã tạo', ZIP_OUT, f'({ZIP_OUT.stat().st_size / 1e6:.1f} MB)')
+else:
+    print('Chưa chạy xong nên chưa đóng gói: ở phiên sau Run all lại.')
+''')
+
+md('## 9. Ghi hết dữ liệu lên Drive (chờ dòng "Đã ghi hết" rồi mới đóng phiên)')
+code('''
+drive.flush_and_unmount()
+print('Đã ghi hết dữ liệu lên Drive. Có thể đóng phiên Colab.')
+''')
+
+md('''
+**Bước tiếp theo:** tải `ket_qua_weeds_xai.zip` về, giải nén vào thư mục gốc của repo (sẽ tạo thư mục `results/weeds_xai/`), rồi nhờ Claude phân tích.
+''')
+
+write_notebook('colab_weeds_xai.ipynb')
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Model check of the counterfactual explanations (src/weeds/counterfactual_check.py)
+# ---------------------------------------------------------------------------------------------------------------------
+# the decisions, thresholds and bare-soil values of the XAI run, so that the check is on exactly those decisions
+XAI_DIR = ROOT / 'results' / 'weeds_xai'
+CF_INPUTS = {name: (XAI_DIR / name).read_text(encoding='utf-8') if (XAI_DIR / name).exists() else None
+             for name in ('decisions.csv', 'soil_baseline.json')}
+
+md('''
+# Kiểm chứng giải thích phản thực bằng mô hình
+
+Giải thích phản thực (`src/weeds/counterfactual.py`, chạy trên máy) trả lời câu hỏi: *bỏ ít nhất bao nhiêu vùng cỏ 5 cm × 5 cm thì ô lưới hết PHUN, hoặc thành KHÔNG PHUN?* Câu trả lời đó là **ước lượng**: lấy điểm số của ô trừ đi phần xác suất cỏ của các vùng bị bỏ, không chạy lại mô hình. Đối chiếu ở 5 mức che cho thấy ước lượng khớp mô hình khoảng 95% nhưng hơi lạc quan ở các ô sát ngưỡng.
+
+Notebook này cho **mô hình chấm lại thật**: với mỗi ô PHUN và CHƯA CHẮC (113 ô, mô hình công bố của tác giả, đúng các quyết định đã phân tích trong `results/weeds_xai`), lần lượt thay 1, 2, 3, ... vùng nhiều cỏ nhất bằng đất rồi cho mô hình chấm lại ô ảnh, cho đến khi mô hình ra KHÔNG PHUN và đã vượt cả hai số ước lượng thêm 2 vùng (hoặc đã bỏ hết các vùng của ô). Kết quả cho biết, ở từng ô, bỏ đúng các vùng mà lời giải thích chỉ ra thì mô hình đổi quyết định ở vùng thứ mấy, và ước lượng lệch bao nhiêu vùng. Đây là kiểm chứng câu giải thích "bỏ k vùng này thì ô hết phun"; nó không chứng minh k là ít nhất với mô hình, vì một tập vùng khác có thể làm đổi quyết định với ít vùng hơn.
+
+Khối lượng: khoảng 2.200 lần chạy mô hình nếu mô hình khớp ước lượng (bằng khoảng 1/4 phép che trong notebook XAI); mục 5 in thời gian ước tính sau khi chạy thử 1 ô ảnh. Kết quả lưu theo từng ô ảnh, nên nếu bị ngắt thì Run all lại sẽ chạy tiếp. Chỉ cần tập test (không cần tập train).
+
+**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mục 8 tạo `ket_qua_weeds_cfcheck.zip` (chỉ có csv và json) khi đã chạy xong.
+''')
+
+md('## 1. Kết nối Drive và ghi mã nguồn (chạy ở **mọi** phiên)')
+code(setup_code('''
+RUN = BASE / 'cfcheck_authors_msi3'  # model check of the counterfactuals of the authors' 5-band, 3-class model
+RESULTS = Path('results/weeds_cfcheck')  # folder inside the downloaded zip
+CKPT_ZIP = BASE / 'authors_ckpts' / 'ckpts.zip'  # shared with colab_weeds_authors.ipynb and colab_weeds_xai.ipynb
+''', "print('Thư mục kết quả:', RUN)"))
+
+md('## 2. Phần A: tải và chuẩn bị dữ liệu (bỏ qua nếu đã có)')
+code(DATA_CODE)
+
+md('## 3. Phần A: tải mô hình của tác giả lên Drive (887 MB, bỏ qua nếu đã có)')
+code('''
+from src.weeds.authors import CKPT_URL, CKPT_ZIP_BYTES
+
+CKPT_ZIP.parent.mkdir(parents=True, exist_ok=True)
+if not CKPT_ZIP.exists() or CKPT_ZIP.stat().st_size != CKPT_ZIP_BYTES:
+    subprocess.run(['curl', '-L', '--retry', '3', '-o', str(CKPT_ZIP), CKPT_URL], check=True)
+assert CKPT_ZIP.stat().st_size == CKPT_ZIP_BYTES, f'Kích thước ckpts.zip không đúng: {CKPT_ZIP.stat().st_size}'
+print('ckpts.zip đã có trên Drive:', CKPT_ZIP)
+''')
+
+md('''
+## 4. Phần B: kiểm tra GPU, chép dữ liệu và mô hình về máy Colab
+
+Trước mục này: *Runtime → Change runtime type → T4 GPU*, rồi chạy lại mục 1.
+''')
+code(gpu_code(('test',)))
+code(f'''
+import time, zipfile
+CKPT = Path('/content/ckpts/dlv3p_msi_3.pth')
+CKPT.parent.mkdir(exist_ok=True)
+with zipfile.ZipFile(CKPT_ZIP) as z:
+    member = 'ckpts/dlv3p_msi_3.pth'
+    if not CKPT.exists() or CKPT.stat().st_size != z.getinfo(member).file_size:
+        tmp = CKPT.with_suffix('.tmp')
+        tmp.write_bytes(z.read(member))
+        tmp.replace(CKPT)
+# the decisions, thresholds and bare-soil values of results/weeds_xai, embedded when this notebook was generated
+CF_INPUTS = {CF_INPUTS!r}
+assert all(CF_INPUTS.values()), 'Notebook được sinh khi chưa có results/weeds_xai: báo cho Claude.'
+INPUTS = Path('/content/cf_inputs')
+INPUTS.mkdir(exist_ok=True)
+for name, text in CF_INPUTS.items():
+    (INPUTS / name).write_text(text)
+CF_ARGS = ['--ckpt', CKPT, '--decisions', INPUTS / 'decisions.csv', '--soil', INPUTS / 'soil_baseline.json']
+# the session clock counts from the start of this Colab VM, so running the notebook again on it does not reset it
+T0 = time.time() - float(Path('/proc/uptime').read_text().split()[0])
+SESSION_HOURS = 3.5
+print(CKPT, f'{{CKPT.stat().st_size / 1e6:.0f}} MB | máy Colab đã chạy {{(time.time() - T0) / 3600:.2f}} giờ')
+''')
+
+md('''
+## 5. Chạy thử trên 1 ô ảnh (vài phút, chỉ ở phiên đầu)
+
+Bắt lỗi và đo thời gian. Dòng `estimated full run` cho biết thời gian ước tính của mục 6 (là cận dưới: lâu hơn nếu mô hình cần bỏ nhiều vùng hơn ước lượng). Nếu báo lỗi hết bộ nhớ (out of memory), dừng lại và báo cho Claude.
+''')
+code('''
+if (RUN / 'parts').exists() and any((RUN / 'parts').iterdir()):
+    print('Đã có kết quả từ phiên trước: bỏ qua chạy thử.')
+else:
+    shutil.rmtree('/content/cfcheck_smoke', ignore_errors=True)
+    run('src.weeds.counterfactual_check', '--data', DATA, *CF_ARGS, '--out', '/content/cfcheck_smoke',
+        '--limit-tiles', 1)
+''')
+
+md('## 6. Kiểm chứng toàn bộ 113 ô PHUN và CHƯA CHẮC (chạy tiếp được nếu bị ngắt)')
+code('''
+left = SESSION_HOURS - (time.time() - T0) / 3600
+if left < 0.3:
+    print(f'Phiên này gần hết giờ (còn {left:.2f} giờ): mở phiên mới rồi Run all lại.')
+else:
+    run('src.weeds.counterfactual_check', '--data', DATA, *CF_ARGS, '--out', RUN, '--budget-hours', f'{left - 0.2:.2f}')
+if not (RUN / 'cfcheck_summary.json').exists():
+    print('Chưa xong: ở phiên sau Run all lại, các ô ảnh đã xong được giữ lại.')
+''')
+
+md('''
+## 7. Kết quả
+
+`k_not_spray`: bỏ lần lượt các vùng theo lời giải thích thì đến vùng thứ mấy ô hết PHUN; `k_no_spray`: đến vùng thứ mấy ô thành KHÔNG PHUN. `exact`: số ô mà ước lượng đúng bằng mô hình; `estimate_too_small`: số ô mà ước lượng ít vùng hơn mô hình cần (ước lượng lạc quan). `reverts_*`: số ô mà quyết định đổi ngược lại khi bỏ thêm vùng.
+''')
+code('''
+summary = json.loads((RUN / 'cfcheck_summary.json').read_text()) if (RUN / 'cfcheck_summary.json').exists() else None
+if summary:
+    for key in ('rescored_decision_differs', 'k_not_spray', 'k_not_spray_fragile', 'k_no_spray', 'reverts_to_spray',
+                'reverts_from_no_spray', 'curve', 'forward_passes', 'seconds_per_cell'):
+        print(key, json.dumps(summary[key], ensure_ascii=False))
+''')
+
+md('## 8. Đóng gói kết quả (chỉ khi đã chạy xong)')
+code('''
+ZIP_OUT = BASE / 'ket_qua_weeds_cfcheck.zip'
+if (RUN / 'cfcheck_summary.json').exists():
+    with zipfile.ZipFile(ZIP_OUT, 'w', zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(RUN.glob('*')):
+            if f.suffix in ('.json', '.csv'):
+                z.write(f, RESULTS / f.name)
+    print('Đã tạo', ZIP_OUT, f'({ZIP_OUT.stat().st_size / 1e6:.1f} MB)')
+else:
+    print('Chưa chạy xong nên chưa đóng gói: ở phiên sau Run all lại.')
+''')
+
+md('## 9. Ghi hết dữ liệu lên Drive (chờ dòng "Đã ghi hết" rồi mới đóng phiên)')
+code('''
+drive.flush_and_unmount()
+print('Đã ghi hết dữ liệu lên Drive. Có thể đóng phiên Colab.')
+''')
+
+md('''
+**Bước tiếp theo:** tải `ket_qua_weeds_cfcheck.zip` về thư mục gốc của repo rồi nhờ Claude giải nén (vào `results/weeds_cfcheck/`) và phân tích.
+''')
+
+write_notebook('colab_weeds_cfcheck.ipynb')

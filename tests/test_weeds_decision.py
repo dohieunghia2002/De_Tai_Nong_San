@@ -162,3 +162,23 @@ def test_go_no_go_compares_miou_with_the_paper_value_for_the_same_input():
     assert ours['required'] == '>= 77.90' and not ours['pass']
     rgb = go_no_go(df, {'test': {'miou': 76.0}, 'paper_test': {'miou': 79.33}})['checks']['C1_test_miou']
     assert rgb['required'] == '>= 74.33' and rgb['pass']
+
+
+def test_primary_decisions_match_the_crossfit_metrics():
+    # the per-cell decisions behind the explanations and the figure give the metrics analyze reports
+    from src.weeds.analyze import SCOPES, primary_decisions
+    from src.weeds.decision import evaluate_crossfit
+    rng = np.random.default_rng(0)
+    tiles = [f'2023-05-30_{i:04d}' for i in range(8)] + ['2023-06-15_0001']  # the last one is after herbicide
+    w = rng.choice([0.0, 0.002, 0.008, 0.02, 0.05], size=9 * len(tiles))
+    cells = pd.DataFrame({'tile': np.repeat(tiles, 9), 'date': [t[:10] for t in np.repeat(tiles, 9)],
+                          'cell_size': 200, 'w': w, 'crop': 0.1, 's': w + rng.normal(0, 0.004, w.size)})
+    fold_of = {t: i % 2 for i, t in enumerate(tiles)}
+    t = primary_decisions(cells, fold_of)
+    assert set(t['date']) <= set(SCOPES[PRIMARY['scope']]) and len(t) == 72
+    assert t.groupby('tile')['cell'].apply(list).map(lambda c: c == list(range(9))).all()
+    ref = {r['policy']: r for r in evaluate_crossfit(t, t['fold'].to_numpy(), PRIMARY['tau'], 0.1, 0.1)}
+    m = decision_metrics(t['decision'], t['w'] >= PRIMARY['tau'], t['w'], t['crop'])
+    for k in ('deferred', 'spray_reduction', 'missed_need_rate', 'false_spray_rate'):
+        assert m[k] == pytest.approx(ref[PRIMARY['policy']][k], nan_ok=True)
+    assert tuple(t.groupby('fold')['lam_lo'].first()) == pytest.approx(ref[PRIMARY['policy']]['lam_lo'])

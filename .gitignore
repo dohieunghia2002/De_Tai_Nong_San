@@ -15,3 +15,5 @@ data/
 ket_qua_*.zip
 # Xác suất dự đoán của thí nghiệm thử (khoảng 50 MB, tạo lại được bằng notebook)
 results/**/probs_*.npz
+# Bản đồ giải thích (XAI) thu nhỏ, khoảng 20 MB, tạo lại được bằng notebook
+results/**/xai_maps.npz

@@ -92,14 +92,21 @@ Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\pyth
 | `src/weeds/analyze.py` | Chạy tầng quyết định cho mọi thiết lập và kết luận đạt/không đạt |
 | `src/weeds/authors.py` | Đánh giá các mô hình công bố sẵn của tác giả bằng code của đề tài, so với Bảng 3–4 của bài báo |
 | `src/weeds/runs.py` | Các lần huấn luyện thêm (nhiều seed, lịch huấn luyện của tác giả, learning rate giảm dần) và bảng tổng hợp |
-| `scripts/make_weeds_notebook.py` | Sinh 2 notebook Colab có nhúng sẵn mã nguồn `src/weeds/` |
+| `src/weeds/explain.py` | XAI: giải thích quyết định từng ô (Integrated Gradients, Grad-CAM, mức quan trọng từng dải phổ) và kiểm chứng độ trung thực bằng phép che vùng có đối chứng ngẫu nhiên |
+| `src/weeds/counterfactual.py` | Giải thích phản thực ở mức quyết định: bỏ những vùng cỏ nào thì ô hết phun, thêm bao nhiêu cỏ thì ô phải phun; tính từ bản đồ xác suất, không cần GPU |
+| `src/weeds/counterfactual_check.py` | Cho mô hình chấm lại để kiểm chứng giải thích phản thực: bỏ đúng các vùng cỏ mà lời giải thích chỉ ra thì đến vùng thứ mấy quyết định đổi (chạy trên Colab) |
+| `scripts/make_weeds_notebook.py` | Sinh các notebook Colab có nhúng sẵn mã nguồn `src/weeds/` |
 | `scripts/export_weeds_images.py` | Xuất ảnh xem trước của toàn bộ dữ liệu |
 | `scripts/make_pipeline_figure.py` | Vẽ sơ đồ xử lý của hệ thống trên một ô ảnh test thật |
 | `notebooks/colab_weeds_pilot.ipynb` | Notebook Colab huấn luyện và chạy tầng quyết định (sinh tự động, không sửa tay) |
 | `notebooks/colab_weeds_authors.ipynb` | Notebook Colab đối sánh với bài báo bằng mô hình của tác giả (sinh tự động) |
 | `notebooks/colab_weeds_runs.ipynb` | Notebook Colab chạy các lần huấn luyện thêm, tự chạy tiếp qua nhiều phiên (sinh tự động) |
+| `notebooks/colab_weeds_xai.ipynb` | Notebook Colab giải thích quyết định và kiểm chứng độ trung thực (sinh tự động) |
+| `notebooks/colab_weeds_cfcheck.ipynb` | Notebook Colab kiểm chứng giải thích phản thực bằng mô hình (sinh tự động) |
 | `tests/` | Test đọc dữ liệu, huấn luyện trên ảnh nhỏ (CPU), tầng quyết định |
 | `results/weeds_pilot/`, `results/weeds_pilot_b8/` | Kết quả lần 1 (batch 2) và lần 2 (batch 8); file `probs_*.npz` không commit |
+| `results/weeds_xai/` | Kết quả giải thích quyết định và kiểm chứng độ trung thực; file `xai_maps.npz` không commit |
+| `results/weeds_counterfactual/` | Giải thích phản thực cho 216 ô (chạy trên máy bằng `python -m src.weeds.counterfactual`) |
 | `docs/BAN_GIAO_SESSION.md` | Bàn giao giữa các phiên làm việc: tình trạng, kết quả, việc tiếp theo |
 | `docs/*.pdf` | Bài báo liên quan (chỉ có trên máy, không commit) |
 
