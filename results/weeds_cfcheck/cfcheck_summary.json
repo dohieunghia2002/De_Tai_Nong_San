@@ -1,0 +1,104 @@
+{
+ "config": {
+  "version": 1,
+  "ckpt": "dlv3p_msi_3.pth",
+  "cell": 200,
+  "patch": 20,
+  "extra": 2,
+  "amp": true,
+  "soil": [
+   0.48145267367362976,
+   0.44922560453414917,
+   0.40820935368537903,
+   0.38867780566215515,
+   0.4248111844062805
+  ],
+  "decisions_sha256": "7b700f3f4db14e429de0cc14139b4e360f6d796efc13c939a6e034e0446a7c81"
+ },
+ "soil_baseline": {
+  "R": 0.48145267367362976,
+  "G": 0.44922560453414917,
+  "B": 0.40820935368537903,
+  "NIR": 0.38867780566215515,
+  "RE": 0.4248111844062805
+ },
+ "cells": 113,
+ "decisions": {
+  "spray": 104,
+  "defer": 9
+ },
+ "rescored_decision_differs": 0,
+ "k_not_spray": {
+  "cells": 104,
+  "compared": 104,
+  "model_not_reached": 0,
+  "estimate_not_reached": 0,
+  "exact": 46,
+  "estimate_too_small": 49,
+  "estimate_too_large": 9,
+  "model_minus_estimate": {
+   "-3": 1,
+   "-2": 4,
+   "-1": 4,
+   "0": 46,
+   "1": 31,
+   "2": 11,
+   "3": 2,
+   "4": 4,
+   "5": 1
+  }
+ },
+ "k_not_spray_fragile": {
+  "cells": 18,
+  "compared": 18,
+  "model_not_reached": 0,
+  "estimate_not_reached": 0,
+  "exact": 14,
+  "estimate_too_small": 4,
+  "estimate_too_large": 0,
+  "model_minus_estimate": {
+   "0": 14,
+   "1": 4
+  }
+ },
+ "k_no_spray": {
+  "cells": 113,
+  "compared": 113,
+  "model_not_reached": 0,
+  "estimate_not_reached": 0,
+  "exact": 50,
+  "estimate_too_small": 49,
+  "estimate_too_large": 14,
+  "model_minus_estimate": {
+   "-3": 3,
+   "-2": 1,
+   "-1": 10,
+   "0": 50,
+   "1": 22,
+   "2": 16,
+   "3": 6,
+   "4": 2,
+   "5": 1,
+   "6": 2
+  }
+ },
+ "reverts_to_spray": 5,
+ "reverts_from_no_spray": 5,
+ "max_score_increase_cm2": {
+  "median": 0.0,
+  "max": 10.103858076035976
+ },
+ "curve": {
+  "rows": 2256,
+  "error_cm2_median": -3.442541479586631,
+  "abs_error_cm2_median": 3.8533068750226662,
+  "abs_error_cm2_p95": 14.470461036990853,
+  "abs_error_cm2_max": 33.45479888621834,
+  "decision_agreement": 0.9171099290780141,
+  "rows_decision_changed": 1003,
+  "decision_agreement_where_changed": 0.8135593220338984
+ },
+ "forward_passes": 2273,
+ "seconds": 118.71840453147888,
+ "seconds_per_cell": 1.0506053498360963
+}

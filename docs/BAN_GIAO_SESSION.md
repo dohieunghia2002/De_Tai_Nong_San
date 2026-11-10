@@ -114,7 +114,7 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
 - `src/weeds/runs.py` định nghĩa các lần huấn luyện thêm và hàm tổng hợp; `train.py` có thêm `--lr-schedule cosine`, lưu trạng thái lịch learning rate trong checkpoint để chạy tiếp đúng; `train_done.json` ghi thêm epochs, patience, lr_schedule. `notebooks/colab_weeds_runs.ipynb` sinh bởi cùng script.
 - `src/weeds/counterfactual.py`: giải thích phản thực ở mức quyết định, tính từ bản đồ xác suất, không chạy lại mô hình (xem mục 6, 2b).
 - `src/weeds/counterfactual_check.py`: cho mô hình kiểm chứng giải thích phản thực trên Colab; notebook `notebooks/colab_weeds_cfcheck.ipynb`.
-- Có 62 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Bộ mặc định chạy khoảng 2 phút; test chạy cả quy trình XAI chỉ chạy khi đặt `WEEDS_SLOW_TESTS=1`. Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
+- Có 68 test trong `tests/` (các file `test_weeds_*.py` và `test_pipeline_figure.py`). Bộ mặc định chạy khoảng 2 phút; test chạy cả quy trình XAI chỉ chạy khi đặt `WEEDS_SLOW_TESTS=1`. Chạy test cần dữ liệu bằng `WEEDSGALORE_ZIP=data/weedsgalore/weedsgalore-dataset.zip .venv/Scripts/python -m pytest`. Venv đã có torch 2.6.0 bản CPU.
 
 ## 5. Kết quả thí nghiệm thử
 
@@ -236,6 +236,30 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
   - **Phép thay từng dải tạo phổ không có thật**: ở 57/103 ô KHÔNG PHUN, thay RE bằng giá trị đất đẩy s vượt 1%, tức mô hình "thấy cỏ" ở nơi không có. Vì vậy lời giải thích theo dải phổ nên dựa vào IG; phép thay dải chỉ dùng tham khảo.
   - IG đo so với ảnh đất trống, nên trả lời câu hỏi "vì sao là cỏ mà không phải đất", **không** trả lời "vì sao là cỏ mà không phải ngô".
 
+**Giải thích phản thực, kiểm chứng bằng mô hình** (`results/weeds_cfcheck/`, Colab ngày 10/11/2026; mô hình tác giả `dlv3p_msi_3`, fp16, vùng 5 cm, quét thêm 2 vùng; số liệu từ `cfcheck_summary.json`, `cfcheck_cells.csv`, `cfcheck_steps.csv`). Cách làm ở mục 6, 2b.
+- **Các phép kiểm tra đều đạt:**
+  - Colab dùng đúng `results/weeds_xai/decisions.csv` (mã băm trùng);
+  - không ô nào đổi quyết định khi mô hình chấm lại;
+  - ước lượng trên Colab (bản đồ fp32) trùng với `results/weeds_counterfactual/` (bản đồ float16 trên máy) ở cả 113 ô, cả hai giá trị k, và thứ tự vùng trùng nhau. Như vậy chính các con số của bước 2 đã được kiểm chứng.
+- **Thời gian:** 2.273 lần chạy mô hình, 119 giây trên T4, tức 1,05 giây mỗi ô (0,052 giây mỗi lần chạy). Ước lượng chỉ mất 0,42 ms mỗi ô trên laptop.
+- **104 ô PHUN, "bỏ bao nhiêu vùng thì hết PHUN" (k theo đúng thứ tự vùng của lời giải thích):**
+  - ước lượng đúng chính xác ở 46 ô (44%), thiếu vùng ở 49 ô, thừa vùng ở 9 ô;
+  - phân bố mô hình trừ ước lượng: −3: 1, −2: 4, −1: 4, 0: 46, +1: 31, +2: 11, +3: 2, +4: 4, +5: 1. Lệch không quá 1 vùng ở 81/104 ô (78%), không quá 2 vùng ở 96/104 ô (92%);
+  - sai lệch tương đối có trung vị 0, phân vị 90% là 17,7%, lớn nhất 42,9%. Sai lệch tăng theo k: ô có k ước lượng ≤ 2 lệch trung bình +0,22 vùng, ô có k > 20 lệch +1,22 vùng;
+  - theo ngày: 30/5 đúng 19/30 ô, 6/6 đúng 26/72 ô, 25/5 đúng 1/2 ô;
+  - **các quyết định "mong manh" là có thật:** mô hình xác nhận 11 ô PHUN hết phun chỉ khi bỏ 1 vùng 5 cm (ước lượng cũng ra 11 ô), 14 ô với tối đa 2 vùng (ước lượng 18), 25 ô với tối đa 4 vùng (ước lượng 26). Trong 18 ô có k ước lượng ≤ 2, ước lượng đúng 14 ô và thiếu 1 vùng ở 4 ô.
+- **Câu giải thích "bỏ k vùng này thì ô hết PHUN", lấy k = k ước lượng + m, đúng theo mô hình ở:** m = 0: 54/104 ô (51,9%); m = 1: 85/104 (81,7%); m = 2: 95/104 (91,3%); m = 3: 98/104 (94,2%); m = 4: 98/101 ô đã quét (97,0%). Với câu "... thì KHÔNG PHUN" (113 ô): 56,6%, 74,3%, 87,6%, 91,6% (98/107), 94,0% (94/100). **Lưu ý:** m được chọn trên chính tập test, nên đây là con số trong mẫu.
+- **9 ô CHƯA CHẮC:** 8 ô đúng chính xác. Bỏ 1 vùng thì mô hình cho KHÔNG PHUN, đúng như ước lượng. Ô còn lại ước lượng 2 vùng, mô hình cần 3. Như vậy câu "chỉ cần ra kiểm tra 1–3 vùng 5 cm này" đã được mô hình xác nhận cho cả 9 ô.
+- **Tính cộng dồn của ước lượng không đúng hoàn toàn (ảnh hưởng của vùng xung quanh):**
+  - mức giảm s của ước lượng lớn hơn mô hình khoảng 4–8% (trung vị tỉ số: 1,08 ở k = 1, 1,04 ở k = 10); sai số trung vị theo đường cong là −3,4 cm² (ước lượng thấp hơn), phân vị 95% của trị tuyệt đối là 14,5 cm². Sai số lớn hơn ở ngày 6/6, khi có nhiều cỏ;
+  - ở 20 ô, bỏ thêm một vùng lại làm s **tăng** hơn 1 cm² (lớn nhất 10,1 cm²); ví dụ `2023-05-30_0720` ô 2: bỏ vùng thứ 2 làm s tăng từ 48,8 lên 56,0 cm²;
+  - 7 ô có quyết định đổi rồi đổi ngược lại khi bỏ thêm vùng (5 ô quay lại PHUN, 5 ô rời KHÔNG PHUN, có ô thuộc cả hai). Tất cả đều xảy ra sát ngưỡng.
+- **Độ trùng quyết định dọc đường quét:** 91,7% trên 2.256 trường hợp, 81,4% trên 1.003 trường hợp có đổi quyết định. Con số này thấp hơn 95,1% ở bước 1 vì phép quét dồn vào vùng sát ngưỡng; hai con số đo trên hai tập trường hợp khác nhau, không so trực tiếp được.
+- **Kết luận cho luận văn:**
+  - lời giải thích phản thực đưa vào báo cáo nên lấy **k đã được mô hình kiểm chứng** (từ phép quét), không lấy k ước lượng;
+  - ước lượng là xấp xỉ nhanh, lệch tối đa 1 vùng ở 78% ô, nhưng thường lạc quan;
+  - kiểm chứng bằng mô hình tốn khoảng 1 giây mỗi ô trên T4, chấp nhận được cho các ô người vận hành cần xem.
+
 ## 6. Việc tiếp theo
 
 1. **Đối sánh với bài báo** (thầy yêu cầu ngày 05/11), làm theo từng bước:
@@ -334,7 +358,7 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
      - Còn lại, không phải lỗi:
        - phép đối chiếu chỉ ở 5 mức che cố định, chưa ở đúng k của từng ô (vì vậy cần bước 3);
        - bản đồ lưu ở float16 có thể xếp hạng khác bản fp32 trên Colab khi hai vùng gần bằng nhau, nhưng khi đó ước lượng chỉ thay đổi tối đa bằng hiệu khối lượng giữa hai vùng.
-   - **Bước 3 (10/11): code và notebook đã sẵn sàng, chưa chạy.**
+   - **Bước 3: đã chạy trên Colab ngày 10/11, kết quả ở `results/weeds_cfcheck/`, phân tích ở cuối mục 5.**
      - Module `src/weeds/counterfactual_check.py` (GPU) và 6 test trong `tests/test_weeds_counterfactual_check.py` (CPU, khoảng 25 giây). Notebook: `notebooks/colab_weeds_cfcheck.ipynb`, sinh bởi `scripts/make_weeds_notebook.py`.
      - **Cách làm:** với mỗi ô PHUN/CHƯA CHẮC (113 ô), xếp hạng các vùng 5 cm trong ô theo xác suất cỏ của mô hình (fp32, như mốc `predicted_weed`). Lần lượt thay 1, 2, 3, ... vùng bằng đất rồi cho mô hình chấm lại. Dừng khi mô hình đã cho KHÔNG PHUN và k đã vượt cả hai số ước lượng thêm 2 vùng (`--extra`), hoặc khi đã bỏ hết 100 vùng của ô.
      - **Ghi lại:**
@@ -351,7 +375,16 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
        - mô tả thời gian ước tính.
        Thêm test kiểm chứng độc lập với mạng DeepLab ngẫu nhiên: tự xếp hạng vùng và chấm từng ảnh một cho mọi k. Điểm số trong test này tăng ở 8/16 bước, quyết định đổi rồi đổi ngược lại; thứ tự vùng, điểm số, k và cờ đổi ngược đều khớp với phép quét theo lô.
      - Test với mô hình giả theo từng điểm ảnh: ước lượng khớp mô hình, k tính tay đúng, điều kiện dừng đúng. Riêng ô toàn đất có ngưỡng rất nhỏ thì ước lượng đạt KHÔNG PHUN còn mô hình thì không, vì ước lượng coi đất có xác suất cỏ bằng 0. Đây đúng là loại sai lệch cần đo.
-   - **Việc tiếp theo:** vẽ hình giải thích cho vài ô tiêu biểu (vùng lấy từ xác suất cỏ hoặc IG, dải phổ lấy từ IG); viết lời giải thích bằng chữ cho từng ô (quy tắc, vùng, dải phổ); bổ sung vào báo cáo gửi thầy, kể cả kết quả âm của Grad-CAM.
+   - **Hình giải thích (10/11):** `scripts/make_counterfactual_figure.py` vẽ `data/weedsgalore/hinh_giai_thich_phan_thuc.png` (2200 × 1793 điểm ảnh, nằm trong `data/` nên không commit). Script chạy khoảng 10 giây trên máy, dùng matplotlib 3.10.9 (đã thêm vào `requirements.txt`).
+     - **Mỗi ví dụ một hàng:** ô ảnh 1,5 m có viền ô lưới; ô phóng to với các vùng cần bỏ (đánh số khi không quá 9 vùng); bản đồ xác suất cỏ; đường cong lượng cỏ dự đoán theo số vùng bỏ (mô hình chấm lại và ước lượng nhanh, nền tô theo vùng quyết định); đóng góp IG của từng dải tính bằng cm²; ba câu giải thích: vì sao, đổi gì thì quyết định đổi (k đã kiểm chứng), dải phổ và nhãn thật.
+     - **Ví dụ được chọn theo quy tắc cố định** (hàm `pick_examples`), bỏ qua các ô có quyết định đổi ngược lại:
+       1. PHUN mong manh: ô có nhiều cỏ dự đoán nhất trong các ô mà mô hình xác nhận bỏ 1 vùng là hết PHUN → `2023-05-30_0649` ô 5 (đánh số từ 1). Bỏ 1 vùng thì thành CHƯA CHẮC, bỏ 2 vùng thì KHÔNG PHUN; nhãn thật 1,38%.
+       2. CHƯA CHẮC: ô có nhiều cỏ dự đoán nhất trong các ô chỉ cần bỏ 1 vùng → `2023-05-30_0649` ô 6. Bỏ 1 vùng thì KHÔNG PHUN; nhãn thật 0,94%, tức ô thực ra không cần phun.
+       3. Ngày phun gần nhất (6/6), ước lượng thiếu từ 2 vùng trở lên, lấy ô có k ở giữa → `2023-06-06_0770` ô 1. Mô hình cần 29 vùng, ước lượng nhanh 27 vùng; nhãn thật 13,62%.
+     - **Kiểm tra trước khi vẽ:** điểm số từ bản đồ xác suất trên máy khớp với Colab, và thứ tự vùng khớp với `results/weeds_counterfactual`. 6 test trong `tests/test_counterfactual_figure.py`.
+     - **Màu:** màu CHƯA CHẮC đổi từ `#f5aa00` (màu của hình sơ đồ cũ) sang `#c98500`, để bộ ba màu quyết định đạt bộ kiểm tra màu: dải độ sáng, độ phân biệt với người mù màu và tương phản 3:1. Hình sơ đồ cũ giữ nguyên.
+     - Đóng góp IG hiển thị bằng cm² cỏ dự đoán vì các dải cộng lại đúng bằng lượng cỏ dự đoán của ô. Hiển thị theo % thì ra số lớn hơn 100%, vì có dải đóng góp âm.
+   - **Việc tiếp theo:** đưa hình và các kết quả XAI vào báo cáo gửi thầy (https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs), kể cả kết quả âm của Grad-CAM và việc ước lượng nhanh thường lạc quan.
 3. **Đọc toàn văn các bài về ngưỡng phun** để thay τ minh họa bằng ngưỡng có nguồn.
 4. **Thiết kế cách hiệu chỉnh lại khi sang đợt bay mới:** hiệu chỉnh riêng từng ngày hiện có quá ít mẫu.
 5. **Mô-đun giải thích (XAI)** và phép kiểm chứng độ trung thực: đã chạy (mục 2b). Còn lại phần hình, lời giải thích bằng chữ và đưa vào báo cáo.

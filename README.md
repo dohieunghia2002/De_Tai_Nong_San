@@ -98,6 +98,7 @@ Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\pyth
 | `scripts/make_weeds_notebook.py` | Sinh các notebook Colab có nhúng sẵn mã nguồn `src/weeds/` |
 | `scripts/export_weeds_images.py` | Xuất ảnh xem trước của toàn bộ dữ liệu |
 | `scripts/make_pipeline_figure.py` | Vẽ sơ đồ xử lý của hệ thống trên một ô ảnh test thật |
+| `scripts/make_counterfactual_figure.py` | Vẽ hình giải thích phản thực (đã kiểm chứng bằng mô hình) cho 3 ô tiêu biểu, chọn theo quy tắc cố định |
 | `notebooks/colab_weeds_pilot.ipynb` | Notebook Colab huấn luyện và chạy tầng quyết định (sinh tự động, không sửa tay) |
 | `notebooks/colab_weeds_authors.ipynb` | Notebook Colab đối sánh với bài báo bằng mô hình của tác giả (sinh tự động) |
 | `notebooks/colab_weeds_runs.ipynb` | Notebook Colab chạy các lần huấn luyện thêm, tự chạy tiếp qua nhiều phiên (sinh tự động) |
@@ -107,6 +108,7 @@ Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\pyth
 | `results/weeds_pilot/`, `results/weeds_pilot_b8/` | Kết quả lần 1 (batch 2) và lần 2 (batch 8); file `probs_*.npz` không commit |
 | `results/weeds_xai/` | Kết quả giải thích quyết định và kiểm chứng độ trung thực; file `xai_maps.npz` không commit |
 | `results/weeds_counterfactual/` | Giải thích phản thực cho 216 ô (chạy trên máy bằng `python -m src.weeds.counterfactual`) |
+| `results/weeds_cfcheck/` | Kiểm chứng giải thích phản thực bằng mô hình cho 113 ô PHUN và CHƯA CHẮC (Colab) |
 | `docs/BAN_GIAO_SESSION.md` | Bàn giao giữa các phiên làm việc: tình trạng, kết quả, việc tiếp theo |
 | `docs/*.pdf` | Bài báo liên quan (chỉ có trên máy, không commit) |
 
