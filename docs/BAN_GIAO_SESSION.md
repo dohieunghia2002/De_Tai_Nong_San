@@ -199,7 +199,7 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
   - **Khi báo cáo chỉ dùng số của phiên 2**, vì phiên 1 không còn file.
 - **Chọn theo val an toàn hơn lấy epoch cuối.** Mô hình epoch cuối dao động mạnh hơn nhiều: độ lệch chuẩn 6,25, và `es_seed1` ở epoch cuối chỉ đạt 66,93 (IoU ngô 48,4). Giả thuyết "chọn val may mắn" bị bác bỏ. Learning rate cosine làm hai cách chọn trùng nhau.
 - **Dao động tập trung ở ngày 15/6** (2 ô ảnh sau khi phun): mIoU 55,3–80,5 giữa 12 mô hình. Các ngày khác: 25/5 63,3–72,6; 30/5 71,3–78,5; 6/6 75,6–85,9 (`test_by_date`).
-- **Tầng quyết định vững với cả 13 mô hình** (mIoU test 66,93–83,74, thiết lập chính):
+- **Tầng quyết định vững với cả 11 mô hình khác nhau** (mIoU test 66,93–83,74, thiết lập chính). Sửa ngày 11/11: trước đây ghi 13 là sai. `runs_summary.csv` có 12 dòng, nhưng ở `e100_seed0` và `e100_cosine_seed0` mô hình chọn theo val chính là mô hình epoch cuối (cùng epoch 99), nên chỉ có 10 mô hình, cộng lần chạy 2 thành 11. Câu "giữa 12 mô hình" ở trên cũng là 12 dòng, tức 10 mô hình. Các khoảng giá trị không đổi:
   - giảm thuốc 49,5–51,4%;
   - chưa quyết 0–7,9%;
   - bỏ sót tối đa 8,3%, phun nhầm tối đa 7,4%, cả hai đều dưới α = β = 10%.
@@ -384,6 +384,7 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
      - **Kiểm tra trước khi vẽ:** điểm số từ bản đồ xác suất trên máy khớp với Colab, và thứ tự vùng khớp với `results/weeds_counterfactual`. 6 test trong `tests/test_counterfactual_figure.py`.
      - **Màu:** màu CHƯA CHẮC đổi từ `#f5aa00` (màu của hình sơ đồ cũ) sang `#c98500`, để bộ ba màu quyết định đạt bộ kiểm tra màu: dải độ sáng, độ phân biệt với người mù màu và tương phản 3:1. Hình sơ đồ cũ giữ nguyên.
      - Đóng góp IG hiển thị bằng cm² cỏ dự đoán vì các dải cộng lại đúng bằng lượng cỏ dự đoán của ô. Hiển thị theo % thì ra số lớn hơn 100%, vì có dải đóng góp âm.
+     - **Bản gọn cho báo cáo (11/11):** `--simple` vẽ `data/weedsgalore/hinh_giai_thich_don_gian.png` cho khổ A4. Cùng 3 ví dụ; mỗi ví dụ gồm ô 50 cm (chỗ máy cho là cỏ tô đỏ, các vùng đánh số), đường cong chỉ của mô hình chấm lại, và 3 dòng chữ (vì sao, đổi gì thì quyết định đổi, nhãn thật). Bản này được nhúng vào `docs/BAO_CAO_TIEN_DO.md`; bản chi tiết vẫn giữ. Phần vẽ đường cong đã tách thành hàm `draw_curve` dùng chung; bản chi tiết vẽ lại cho ra đúng từng byte như trước.
    - **Việc tiếp theo:** đưa hình và các kết quả XAI vào báo cáo gửi thầy (https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs), kể cả kết quả âm của Grad-CAM và việc ước lượng nhanh thường lạc quan.
 3. **Đọc toàn văn các bài về ngưỡng phun** để thay τ minh họa bằng ngưỡng có nguồn.
 4. **Thiết kế cách hiệu chỉnh lại khi sang đợt bay mới:** hiệu chỉnh riêng từng ngày hiện có quá ít mẫu.

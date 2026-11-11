@@ -75,9 +75,32 @@ def test_text_for_a_defer_cell_and_patch_words():
     why, what, _ = F.text_lines('defer', c, steps, 5.5)
     assert 'giữa ngưỡng không phun 25 cm² và ngưỡng phun 33 cm²' in why
     assert 'thì ô thành KHÔNG PHUN' in what and 'thêm khoảng 5,5 cm² cỏ thì PHUN' in what
-    assert 'ra xem vùng này' in what
+    assert 'nên xem vùng này trước' in what
     assert F.patch_words(1) == 'vùng số 1' and F.patch_words(9) == '9 vùng số 1–9'
     assert F.patch_words(29) == '29 vùng có viền'  # not numbered on the images past NUMBERED
+
+
+def test_simple_lines():
+    # one patch takes the cell to DEFER, the next one to NO_SPRAY
+    c = cell_row(SPRAY, 0.016, 1, 2)
+    steps = steps_for([0.016, 0.011, 0.008], [SPRAY, DEFER, NO_SPRAY], [0.016, 0.010, 0.007])
+    why, change, truth = F.simple_lines(c, steps)
+    assert '40 cm²' in why and 'từ ngưỡng phun 33 cm²' in why and why.endswith('→ PHUN.')
+    assert change == ('Bỏ vùng số 1 → CHƯA CHẮC; bỏ thêm vùng số 2 → KHÔNG PHUN. '
+                      'Chỉ thiếu một đám cỏ nhỏ là quyết định đã đổi.')
+    assert 'ô thật sự cần phun' in truth
+    # many patches, straight to NO_SPRAY
+    c = cell_row(SPRAY, 0.15, 29, 29)
+    steps = steps_for([0.15] + [0.012] * 28 + [0.009], [SPRAY] * 29 + [NO_SPRAY], [0.15] * 30)
+    assert F.simple_lines(c, steps)[1] == ('Phải bỏ tới 29 vùng có viền (29% diện tích ô) mới hết PHUN '
+                                           '(thành KHÔNG PHUN), nên quyết định phun khó đổi.')
+    # DEFER, and a cell that does not need spraying
+    c = cell_row(DEFER, 0.011, 0, 1)
+    c['w'] = 0.005
+    why, change, truth = F.simple_lines(c, steps_for([0.011, 0.007], [DEFER, NO_SPRAY], [0.011, 0.0068]))
+    assert 'giữa ngưỡng không phun 25 cm² và ngưỡng phun 33 cm² → CHƯA CHẮC' in why
+    assert change == 'Bỏ vùng số 1 → KHÔNG PHUN. Người kiểm tra nên xem vùng này trước.'
+    assert 'ô thực ra không cần phun' in truth
 
 
 def test_patch_boxes_are_inside_the_cell():

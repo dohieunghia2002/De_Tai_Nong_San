@@ -246,7 +246,7 @@ def main():
     y0 = y_cap + 126
     box = [MARGIN, y0, W - MARGIN, y0 + 206]
     dashed_rect(d, box)
-    d.text((MARGIN + 20, y0 + 16), 'Lời giải thích cho từng ô (đang phát triển). Ví dụ trên ô ảnh này:',
+    d.text((MARGIN + 20, y0 + 16), 'Lời giải thích theo quy tắc ngưỡng. Ví dụ trên ô ảnh này:',
            font=font(22, True), fill=DARK)
     examples = [cells[cells['decision'] == SPRAY].nlargest(1, 's'), cells[cells['decision'] == DEFER].head(1),
                 cells[cells['decision'] == NO_SPRAY].nsmallest(1, 's')]
@@ -258,8 +258,8 @@ def main():
         d.rectangle([MARGIN + 22, y + 3, MARGIN + 42, y + 23], fill=DECISION[c['decision']][1], outline='black')
         d.text((MARGIN + 54, y), explanation(c), font=font(20), fill=DARK)
         y += 34
-    d.text((MARGIN + 22, y + 6), 'Hướng phát triển: chỉ ra vùng ảnh dẫn tới từng quyết định và kiểm chứng lời giải '
-                                 'thích có trung thực không.', font=font(20), fill=GREY)
+    d.text((MARGIN + 22, y + 6), 'Mỗi ô PHUN và CHƯA CHẮC còn có giải thích "bỏ những vùng cỏ nào thì quyết định đổi", '
+                                 'đã kiểm chứng bằng mô hình (hình giải thích phản thực).', font=font(20), fill=GREY)
 
     f_note = font(17)
     y = box[3] + 16
