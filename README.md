@@ -98,7 +98,9 @@ Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\pyth
 | `scripts/make_weeds_notebook.py` | Sinh các notebook Colab có nhúng sẵn mã nguồn `src/weeds/` |
 | `scripts/export_weeds_images.py` | Xuất ảnh xem trước của toàn bộ dữ liệu |
 | `scripts/make_pipeline_figure.py` | Vẽ sơ đồ xử lý của hệ thống trên một ô ảnh test thật |
-| `scripts/make_counterfactual_figure.py` | Vẽ hình giải thích phản thực (đã kiểm chứng bằng mô hình) cho 3 ô tiêu biểu, chọn theo quy tắc cố định |
+| `scripts/make_counterfactual_figure.py` | Vẽ hình giải thích phản thực (đã kiểm chứng bằng mô hình) cho 3 ô tiêu biểu, chọn theo quy tắc cố định; `--simple` vẽ bản gọn cho khổ A4 |
+| `scripts/embed_report_images.py` | Sinh bản báo cáo có hình nhúng sẵn (để xuất PDF) vào `data/weedsgalore/`, từ `docs/BAO_CAO_TIEN_DO.md` |
+| `docs/BAO_CAO_TIEN_DO.md` | Báo cáo tiến độ gửi thầy (chỉ có chữ; hình nằm trong `data/weedsgalore/`, không commit) |
 | `notebooks/colab_weeds_pilot.ipynb` | Notebook Colab huấn luyện và chạy tầng quyết định (sinh tự động, không sửa tay) |
 | `notebooks/colab_weeds_authors.ipynb` | Notebook Colab đối sánh với bài báo bằng mô hình của tác giả (sinh tự động) |
 | `notebooks/colab_weeds_runs.ipynb` | Notebook Colab chạy các lần huấn luyện thêm, tự chạy tiếp qua nhiều phiên (sinh tự động) |

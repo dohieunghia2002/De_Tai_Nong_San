@@ -385,7 +385,11 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
      - **Màu:** màu CHƯA CHẮC đổi từ `#f5aa00` (màu của hình sơ đồ cũ) sang `#c98500`, để bộ ba màu quyết định đạt bộ kiểm tra màu: dải độ sáng, độ phân biệt với người mù màu và tương phản 3:1. Hình sơ đồ cũ giữ nguyên.
      - Đóng góp IG hiển thị bằng cm² cỏ dự đoán vì các dải cộng lại đúng bằng lượng cỏ dự đoán của ô. Hiển thị theo % thì ra số lớn hơn 100%, vì có dải đóng góp âm.
      - **Bản gọn cho báo cáo (11/11):** `--simple` vẽ `data/weedsgalore/hinh_giai_thich_don_gian.png` cho khổ A4. Cùng 3 ví dụ; mỗi ví dụ gồm ô 50 cm (chỗ máy cho là cỏ tô đỏ, các vùng đánh số), đường cong chỉ của mô hình chấm lại, và 3 dòng chữ (vì sao, đổi gì thì quyết định đổi, nhãn thật). Bản này được nhúng vào `docs/BAO_CAO_TIEN_DO.md`; bản chi tiết vẫn giữ. Phần vẽ đường cong đã tách thành hàm `draw_curve` dùng chung; bản chi tiết vẽ lại cho ra đúng từng byte như trước.
-   - **Việc tiếp theo:** đưa hình và các kết quả XAI vào báo cáo gửi thầy (https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs), kể cả kết quả âm của Grad-CAM và việc ước lượng nhanh thường lạc quan.
+   - **Báo cáo tiến độ bằng Markdown (11/11, người dùng yêu cầu):** `docs/BAO_CAO_TIEN_DO.md`, văn phong đơn giản, gồm 4 mục: Đặt vấn đề, Mô tả bài toán, Phương pháp đề xuất, Kết quả.
+     - Bản trong `docs/` chỉ có chữ và được commit; hình là đường dẫn tới `data/weedsgalore/so_do_pipeline_tac_gia.png` và `hinh_giai_thich_don_gian.png`.
+     - Để xuất PDF: chạy `python scripts/embed_report_images.py`, script sinh `data/weedsgalore/BAO_CAO_TIEN_DO_co_hinh.md` có hình nhúng sẵn (không commit vì chứa ảnh của bộ dữ liệu). Sửa chữ thì sửa bản trong `docs/` rồi chạy lại script.
+     - Đã review 4 lần theo yêu cầu người dùng; mọi câu có số liệu hoặc khẳng định đều được kiểm bằng file kết quả, code, hoặc PDF của bài báo (Celikkan 2025 trang 4 và 8, Celikkan 2023 trang 1, Melki 2025 trang 1–3 và 7–10, code của tác giả trên GitHub).
+   - **Việc tiếp theo:** gửi báo cáo cho thầy; có thể cập nhật thêm artifact báo cáo cũ (https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs).
 3. **Đọc toàn văn các bài về ngưỡng phun** để thay τ minh họa bằng ngưỡng có nguồn.
 4. **Thiết kế cách hiệu chỉnh lại khi sang đợt bay mới:** hiệu chỉnh riêng từng ngày hiện có quá ít mẫu.
 5. **Mô-đun giải thích (XAI)** và phép kiểm chứng độ trung thực: đã chạy (mục 2b). Còn lại phần hình, lời giải thích bằng chữ và đưa vào báo cáo.
