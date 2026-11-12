@@ -1,0 +1,16 @@
+# Streamlit settings for the progress demo (demo/app.py), read when it is started from the repo root.
+
+[browser]
+# do not send usage statistics to Streamlit's servers
+gatherUsageStats = false
+
+[server]
+# no first-run e-mail prompt; open http://localhost:8501 by hand
+headless = true
+# serve this machine only; a specific address also stops Streamlit from looking up the public IP
+# (checkip.amazonaws.com) to print an "External URL"
+address = "localhost"
+
+[theme]
+# the figures are drawn on white
+base = "light"

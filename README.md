@@ -80,6 +80,17 @@ Chạy lại tầng quyết định trên máy, từ xác suất dự đoán đ�
 
 Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\python scripts/export_weeds_images.py`. Mỗi ô ảnh gồm ảnh màu thật, ảnh màu giả NIR và nhãn.
 
+**Bản demo tiến độ** (Streamlit, chạy trên máy, không cần GPU), từ thư mục gốc repo:
+
+```
+.venv\Scripts\streamlit run demo/app.py
+```
+
+Mở http://localhost:8501 trên trình duyệt; dừng bằng Ctrl+C. Demo cần file zip dữ liệu và thư mục `results/` đầy đủ, kể cả các file `probs_*.npz` và `xai_maps.npz` (không có trên GitHub).
+
+- **Trang đầu "Chạy thử hệ thống"** chạy pipeline trên một ô ảnh 5 dải, chọn từ bộ dữ liệu hoặc upload 5 file PNG 16 bit `<tên>_R.png` … `<tên>_RE.png` (để rời, hoặc gói trong một file zip). Trang hiện kết quả của từng module: tìm cỏ, quyết định từng ô, giải thích. Mô hình phân vùng của tác giả chạy trên CPU của máy, mất vài giây cho mỗi ô ảnh. Phần kiểm chứng giải thích bằng mô hình và phần IG nặng hơn nên chỉ chạy khi bấm nút. Trang này cần `ckpts.zip` của tác giả (887 MB, https://doidata.gfz.de/weedsgalore_e_celikkan_2024/ckpts.zip) đặt trong `data/weedsgalore/ckpts/`. Lần chạy đầu, demo tự lấy file `dlv3p_msi_3.pth` ra khỏi `ckpts.zip`.
+- **Các trang "Kết quả đánh giá"**: tổng quan, dữ liệu, tìm cỏ, quyết định phun (đổi được ngưỡng, giới hạn sai, mô hình), giải thích từng ô, kiểm chứng lời giải thích. Mọi con số được đọc từ `results/` hoặc tính lại từ bản đồ xác suất đã lưu. Thiết lập nào có trong `decision_metrics.csv` thì trang tự đối chiếu với file đó; thiết lập không có trong file thì trang ghi là "đang khám phá". Lần mở đầu tiên mất khoảng 20 giây để tính độ sáng ảnh, kết quả được lưu đệm cho các lần sau. `.streamlit/config.toml` tắt việc gửi thống kê sử dụng cho Streamlit.
+
 ## Cấu trúc thư mục
 
 | Đường dẫn | Nội dung |
@@ -101,12 +112,13 @@ Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\pyth
 | `scripts/make_counterfactual_figure.py` | Vẽ hình giải thích phản thực (đã kiểm chứng bằng mô hình) cho 3 ô tiêu biểu, chọn theo quy tắc cố định; `--simple` vẽ bản gọn cho khổ A4 |
 | `scripts/embed_report_images.py` | Sinh bản báo cáo có hình nhúng sẵn (để xuất PDF) vào `data/weedsgalore/`, từ `docs/BAO_CAO_TIEN_DO.md` |
 | `docs/BAO_CAO_TIEN_DO.md` | Báo cáo tiến độ gửi thầy (chỉ có chữ; hình nằm trong `data/weedsgalore/`, không commit) |
+| `demo/` | Bản demo tiến độ bằng Streamlit: `app.py` (điều hướng), `core.py` (đọc kết quả, tính lại quyết định, không dùng Streamlit), `figures.py` (hình), `ui.py` (lưu đệm, định dạng số), `views/` (6 trang) |
 | `notebooks/colab_weeds_pilot.ipynb` | Notebook Colab huấn luyện và chạy tầng quyết định (sinh tự động, không sửa tay) |
 | `notebooks/colab_weeds_authors.ipynb` | Notebook Colab đối sánh với bài báo bằng mô hình của tác giả (sinh tự động) |
 | `notebooks/colab_weeds_runs.ipynb` | Notebook Colab chạy các lần huấn luyện thêm, tự chạy tiếp qua nhiều phiên (sinh tự động) |
 | `notebooks/colab_weeds_xai.ipynb` | Notebook Colab giải thích quyết định và kiểm chứng độ trung thực (sinh tự động) |
 | `notebooks/colab_weeds_cfcheck.ipynb` | Notebook Colab kiểm chứng giải thích phản thực bằng mô hình (sinh tự động) |
-| `tests/` | Test đọc dữ liệu, huấn luyện trên ảnh nhỏ (CPU), tầng quyết định |
+| `tests/` | Test đọc dữ liệu, huấn luyện trên ảnh nhỏ (CPU), tầng quyết định, bản demo |
 | `results/weeds_pilot/`, `results/weeds_pilot_b8/` | Kết quả lần 1 (batch 2) và lần 2 (batch 8); file `probs_*.npz` không commit |
 | `results/weeds_xai/` | Kết quả giải thích quyết định và kiểm chứng độ trung thực; file `xai_maps.npz` không commit |
 | `results/weeds_counterfactual/` | Giải thích phản thực cho 216 ô (chạy trên máy bằng `python -m src.weeds.counterfactual`) |
