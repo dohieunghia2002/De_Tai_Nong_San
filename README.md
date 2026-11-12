@@ -86,7 +86,7 @@ Xuất ảnh JPG xem được của toàn bộ 156 ô ảnh: `.venv\Scripts\pyth
 .venv\Scripts\streamlit run demo/app.py
 ```
 
-Mở http://localhost:8501 trên trình duyệt; dừng bằng Ctrl+C. Demo cần file zip dữ liệu và thư mục `results/` đầy đủ, kể cả các file `probs_*.npz` và `xai_maps.npz` (không có trên GitHub).
+Trình duyệt tự mở http://localhost:8501 (nếu không, mở địa chỉ này bằng tay); dừng bằng Ctrl+C. Demo cần file zip dữ liệu và thư mục `results/` đầy đủ, kể cả các file `probs_*.npz` và `xai_maps.npz` (không có trên GitHub).
 
 - **Trang đầu "Chạy thử hệ thống"** chạy pipeline trên một ô ảnh 5 dải, chọn từ bộ dữ liệu hoặc upload 5 file PNG 16 bit `<tên>_R.png` … `<tên>_RE.png` (để rời, hoặc gói trong một file zip). Trang hiện kết quả của từng module: tìm cỏ, quyết định từng ô, giải thích. Mô hình phân vùng của tác giả chạy trên CPU của máy, mất vài giây cho mỗi ô ảnh. Phần kiểm chứng giải thích bằng mô hình và phần IG nặng hơn nên chỉ chạy khi bấm nút. Trang này cần `ckpts.zip` của tác giả (887 MB, https://doidata.gfz.de/weedsgalore_e_celikkan_2024/ckpts.zip) đặt trong `data/weedsgalore/ckpts/`. Lần chạy đầu, demo tự lấy file `dlv3p_msi_3.pth` ra khỏi `ckpts.zip`.
 - **Các trang "Kết quả đánh giá"**: tổng quan, dữ liệu, tìm cỏ, quyết định phun (đổi được ngưỡng, giới hạn sai, mô hình), giải thích từng ô, kiểm chứng lời giải thích. Mọi con số được đọc từ `results/` hoặc tính lại từ bản đồ xác suất đã lưu. Thiết lập nào có trong `decision_metrics.csv` thì trang tự đối chiếu với file đó; thiết lập không có trong file thì trang ghi là "đang khám phá". Lần mở đầu tiên mất khoảng 20 giây để tính độ sáng ảnh, kết quả được lưu đệm cho các lần sau. `.streamlit/config.toml` tắt việc gửi thống kê sử dụng cho Streamlit.

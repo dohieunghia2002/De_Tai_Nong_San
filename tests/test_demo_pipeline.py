@@ -61,6 +61,10 @@ def test_read_band_files_takes_a_zip_of_the_five_files():
     x, tile = PL.read_band_files(files)
     xz, tile_z = PL.read_band_files([('mau.zip', zipped(files, 'thu_muc/'))])  # also inside a folder of the zip
     assert tile_z == tile and np.array_equal(xz, x)
+    # a label image and macOS metadata next to the bands are left out
+    extra = [('2023-05-30_0001.png', png(np.zeros((600, 600), np.uint8))), ('__MACOSX/._2023-05-30_0001_R.png', b'x')]
+    xz, _ = PL.read_band_files([('mau.zip', zipped(files + extra))])
+    assert np.array_equal(xz, x)
     with pytest.raises(ValueError, match='zip'):
         PL.read_band_files([('hong.zip', b'not a zip')])
     with pytest.raises(ValueError, match='thiếu dải'):

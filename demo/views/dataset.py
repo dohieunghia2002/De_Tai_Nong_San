@@ -4,7 +4,6 @@ import pandas as pd
 import streamlit as st
 
 import core as C
-import figures as F
 import ui
 
 ui.need_data()
@@ -44,7 +43,7 @@ tiles = sorted(t for t in split_of if C.tile_date(t) == date)
 tile_id = st.selectbox('Ô ảnh', tiles, format_func=lambda t: f'{t} · {split_vi[split_of[t]]}')
 x, mask = ui.tile(tile_id)
 lo, hi = map(np.asarray, ui.band_limits())
-ui.show(F.tile_views(x, mask, lo, hi))
+ui.figure('tile_views', x, mask, lo, hi)
 
 shares = pd.DataFrame({'Lớp': [name for name, _ in C.CLASSES],
                        'Diện tích trong ô ảnh': [ui.pct((mask == k).mean(), 2) for k in range(len(C.CLASSES))]})

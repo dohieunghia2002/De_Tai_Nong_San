@@ -7,7 +7,6 @@ import pandas as pd
 import streamlit as st
 
 import core as C
-import figures as F
 import ui
 
 CF = C.CF
@@ -92,14 +91,14 @@ if decision == C.NO_SPRAY:
         'PHUN. Con số này tính theo quy tắc ngưỡng; không kiểm chứng bằng mô hình được vì không thể "thêm cỏ" vào ảnh.\n'
         f'- **Thực tế (theo nhãn):** cỏ chiếm {ui.pct(row["w"], 2)} diện tích ô → '
         + ('ô thật sự **cần phun**: đây là một ô bị bỏ sót.' if need else 'ô thực sự không cần phun.'))
-    ui.show(F.cell_panels(ui.rgb(tile_id), true3, p_weed[t], row, colour, 0, 0))
+    ui.figure('cell_panels', ui.rgb(tile_id), true3, p_weed[t], row, colour, 0, 0)
 else:
     st_steps = steps[(steps['tile'] == tile_id) & (steps['cell'] == cell_idx)].sort_values('k')
     lines = CF.text_lines(None, row, st_steps, row['add_to_spray_cm2'])
     st.markdown('\n'.join(f'- {line}' for line in lines))
     k_no = int(row['k_no_spray_model'])
     k_solid = int(row['k_not_spray_model']) if decision == C.SPRAY else 0
-    ui.show(F.cell_panels(ui.rgb(tile_id), true3, p_weed[t], row, colour, k_solid, k_no))
+    ui.figure('cell_panels', ui.rgb(tile_id), true3, p_weed[t], row, colour, k_solid, k_no)
     st.caption('Viền liền: các vùng cần bỏ để ô hết PHUN; viền đứt: các vùng bỏ thêm để ô thành KHÔNG PHUN. Các vùng '
                'được bỏ lần lượt, vùng nhiều cỏ dự đoán nhất trước (số đánh trên hình là thứ tự này). Số vùng là số mô '
                'hình đã kiểm chứng theo thứ tự đó, không phải số vùng ít nhất có thể.')
@@ -111,7 +110,7 @@ else:
         st.error(f'Dữ liệu không nhất quán: {e}')
     left, right = st.columns([3, 2])
     with left:
-        ui.show(F.removal_curve(row, st_steps))
+        ui.figure('removal_curve', row, st_steps)
     with right:
         bands = pd.DataFrame({'band': list(C.BANDS), 'cm2': [row[f'ig_{b}'] * CELL_CM2 for b in C.BANDS]})
         bands['text'] = [('+' if v >= 0 else '−') + ui.num(abs(v), 1) for v in bands['cm2']]
@@ -130,7 +129,7 @@ else:
 st.markdown('##### Bản đồ giải thích trên cả ô ảnh')
 k = np.flatnonzero((maps['tile'] == tile_id) & (maps['cell'] == cell_idx))
 if len(k):
-    ui.show(F.attribution_panels(ui.rgb(tile_id), maps['ig'][k[0]], maps['grad_cam'][k[0]], cell_idx, colour))
+    ui.figure('attribution_panels', ui.rgb(tile_id), maps['ig'][k[0]], maps['grad_cam'][k[0]], cell_idx, colour)
     st.caption('Cả hai bản đồ giải thích quyết định của ô có viền màu. IG tập trung trong ô đó; Grad-CAM gần như giống '
                'nhau cho mọi ô của cùng ô ảnh (thử chọn ô khác cùng ô ảnh để thấy), nên không chỉ ra được vùng riêng '
                'của từng ô. Trang 5 kiểm chứng điều này bằng số.')

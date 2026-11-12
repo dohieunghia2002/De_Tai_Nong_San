@@ -6,7 +6,6 @@ import pandas as pd
 import streamlit as st
 
 import core as C
-import figures as F
 import ui
 
 ui.need_data()
@@ -34,8 +33,8 @@ st.dataframe(pd.DataFrame({
     'Mô hình': seg['model'], 'mIoU (%)': [ui.num(v, 2) for v in seg['miou']],
     'Nền đất': [ui.num(v, 2) for v in seg['background']], 'Ngô': [ui.num(v, 2) for v in seg['crop']],
     'Cỏ dại': [ui.num(v, 2) for v in seg['weed']]}), hide_index=True)
-st.caption('Nguồn: `segmentation_metrics.json` của từng mô hình (khóa "test"; mô hình tác giả đánh giá ở fp16, chênh '
-           'fp32 dưới 0,002 điểm). Lớp ngô khó nhất vì ngô non nhỏ và giống cỏ.')
+st.caption('Nguồn: `segmentation_metrics.json` của từng mô hình. Mô hình tác giả: lần đánh giá fp32, như code của tác '
+           'giả và như báo cáo (khớp bảng trên); các lần đề tài tự huấn luyện: lần đánh giá fp16 của chính lần chạy đó.')
 
 st.subheader('Xem kết quả trên một ô ảnh kiểm tra')
 c1, c2 = st.columns(2)
@@ -47,7 +46,7 @@ with c2:
 i = list(ids).index(tile_id)
 true3 = C.to_3class(ui.masks('test')[i])
 pred3 = C.predicted_classes(p_crop[i], p_weed[i])
-ui.show(F.segmentation_views(ui.rgb(tile_id), true3, pred3, p_weed[i]))
+ui.figure('segmentation_views', ui.rgb(tile_id), true3, pred3, p_weed[i])
 iou = C.iou_per_class(pred3, true3)
 st.caption(f'IoU trên riêng ô ảnh này, tính lại từ bản đồ xác suất đã lưu: nền đất {ui.iou_text(iou[0])}, ngô '
            f'{ui.iou_text(iou[1])}, cỏ dại {ui.iou_text(iou[2])}. Một ô ảnh ít ngô hoặc ít cỏ có thể có IoU rất thấp '

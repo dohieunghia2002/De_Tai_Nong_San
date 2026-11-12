@@ -150,8 +150,9 @@ def _cell_marks(ax, decisions, need, cell, scale, lw=2.2):
 DECISION_LEGEND = [(C.DECISION_VI[d], C.DECISION_COLOR[d]) for d in (C.SPRAY, C.DEFER, C.NO_SPRAY)]
 
 
-def field_overview(panels, dates, n_locations, cell, title_of_location):
-    """Rows: flight dates; columns: field locations. panels[(date, location)] = (rgb thumbnail, decisions, need)."""
+def field_overview(panels, dates, n_locations, cell, titles):
+    """Rows: flight dates; columns: field locations. panels[(date, location)] = (rgb thumbnail, decisions, need);
+    titles[location] = column title."""
     fig, axs = plt.subplots(len(dates), n_locations, figsize=(2.05 * n_locations, 2.25 * len(dates) + 0.7), dpi=90,
                             squeeze=False)
     for i, date in enumerate(dates):
@@ -168,7 +169,7 @@ def field_overview(panels, dates, n_locations, cell, title_of_location):
             ax.imshow(_tinted(rgb, dec, cell, 0.32), interpolation='bilinear')
             _cell_marks(ax, dec, need, cell, scale, lw=1.6)
             if i == 0:
-                ax.set_title(title_of_location(j + 1), fontsize=10, color=INK2)
+                ax.set_title(titles[j + 1], fontsize=10, color=INK2)
             if j == 0:
                 ax.set_ylabel(C.date_vi(date + '_')[:5], fontsize=11, color=INK2, rotation=0, ha='right',
                               va='center', labelpad=8)

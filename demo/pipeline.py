@@ -103,7 +103,9 @@ def unpack_zips(files):
             continue
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as zf:
-                members = [i for i in zf.infolist() if not i.is_dir() and i.filename.lower().endswith('.png')]
+                # only band files: a zip may also hold a label image, or the '__MACOSX/._*' metadata macOS adds
+                members = [i for i in zf.infolist() if not i.is_dir() and '__MACOSX' not in i.filename
+                           and not Path(i.filename).name.startswith('._') and BAND_FILE.match(Path(i.filename).name)]
                 if sum(i.file_size for i in members) > MAX_ZIP_BYTES:
                     raise ValueError(f'File "{name}" giải nén ra quá lớn.')
                 out += [(Path(i.filename).name, zf.read(i)) for i in members]

@@ -5,8 +5,9 @@
 gatherUsageStats = false
 
 [server]
-# no first-run e-mail prompt; open http://localhost:8501 by hand
-headless = true
+# the browser opens by itself (headless = false). On a machine without ~/.streamlit/credentials.toml, Streamlit asks
+# once for an e-mail in the terminal: press Enter to skip it.
+headless = false
 # serve this machine only; a specific address also stops Streamlit from looking up the public IP
 # (checkip.amazonaws.com) to print an "External URL"
 address = "localhost"

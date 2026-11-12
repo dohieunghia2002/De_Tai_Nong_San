@@ -68,6 +68,17 @@ def test_primary_decisions_equal_the_explained_ones():
     assert np.allclose(merged['lam_lo'], merged['lam_lo_saved']) and np.allclose(merged['lam_hi'], merged['lam_hi_saved'])
 
 
+@needs_results
+def test_authors_models_show_the_reported_miou():
+    """Every table shows the authors' models with the float32 mIoU of authors_vs_paper.json (the report's numbers)."""
+    paper = C.authors_vs_paper().set_index('model')
+    for key in ('authors_msi', 'authors_rgb'):
+        name = C.MODELS[key]['dir'].split('/')[-1]
+        assert C.test_iou(key)['miou'] == paper.loc[name, 'ours']
+    seg = C.segmentation_table().set_index('key')
+    assert seg.loc['authors_rgb', 'miou'] == paper.loc['dlv3p_rgb_3', 'ours']
+
+
 def test_saved_difference_is_none_off_the_saved_grid():
     saved = pd.DataFrame([{'cell_size': 200, 'scope': 'x', 'calibration': 'c', 'policy': p, 'tau': 0.01,
                            **{k: 0.5 for k in C.METRICS}} for p in C.POLICIES])

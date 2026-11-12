@@ -1,5 +1,6 @@
 """Streamlit side of the demo: cached loaders around core, number formatting (Vietnamese decimal comma) and small
 shared widgets. Large arrays are cached as resources (shared, never mutated); tables as data."""
+import io
 import math
 
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 import core as C
+import figures as F
 
 SOURCE = ('Dữ liệu: WeedsGalore (Celikkan và cộng sự, IEEE/CVF WACV 2025), giấy phép CC BY 4.0. '
           'Ngưỡng "cần phun" τ = 1% diện tích ô chỉ là ngưỡng minh họa, chưa có tài liệu làm căn cứ.')
@@ -32,9 +34,19 @@ def iou_text(v, digits=1):
     return f'{num(float(v), digits)}%' if math.isfinite(float(v)) else 'không có (lớp này không xuất hiện)'
 
 
-def show(fig):
-    st.pyplot(fig, clear_figure=True)  # width='stretch' by default
+@st.cache_data(max_entries=128, show_spinner=False)
+def _figure_png(name, args, kwargs):
+    fig = getattr(F, name)(*args, **kwargs)
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=fig.dpi, bbox_inches='tight', facecolor='white')  # as st.pyplot saves it
     plt.close(fig)
+    return buf.getvalue()
+
+
+def figure(name, *args, **kwargs):
+    """Show figures.<name>(*args, **kwargs). Each figure is drawn once per distinct input and kept as a PNG: a rerun
+    caused by another widget (choosing a cell, moving a slider) shows it again at once instead of drawing it anew."""
+    st.image(_figure_png(name, args, kwargs), width='stretch')
 
 
 def need_data():

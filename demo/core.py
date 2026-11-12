@@ -215,13 +215,20 @@ def authors_vs_paper():
                          for k, r in d.items()])
 
 
+def test_iou(key):
+    """Test IoU (%) of a model as the report gives it: for the authors' checkpoints the float32 pass (as their
+    evaluate.py and the paper; the file's 'test' key holds the float16 pass, up to 0.005 points off), for the
+    project's own runs the 'test' key."""
+    d = read_json(model_dir(key) / 'segmentation_metrics.json')
+    return d['fp32']['test'] if 'fp32' in d else d['test']
+
+
 def segmentation_table():
-    """Test IoU (%) of every model with saved results, from its segmentation_metrics.json ('test')."""
+    """Test IoU (%) of every model with saved results (test_iou)."""
     rows = []
     for k, m in MODELS.items():
-        p = model_dir(k) / 'segmentation_metrics.json'
-        if p.exists():
-            t = read_json(p)['test']
+        if (model_dir(k) / 'segmentation_metrics.json').exists():
+            t = test_iou(k)
             rows.append({'key': k, 'model': m['label'], 'miou': t['miou'], 'background': t['background'],
                          'crop': t['crop'], 'weed': t['weed']})
     return pd.DataFrame(rows)

@@ -9,7 +9,6 @@ import pandas as pd
 import streamlit as st
 
 import core as C
-import figures as F
 import pipeline as PL
 import ui
 
@@ -77,6 +76,12 @@ def sample_files(tile_id):
     return PL.sample_files(tile_id)
 
 
+@st.cache_data(max_entries=4, show_spinner=False)
+def read_upload(files):
+    """Decode the uploaded files once (not on every rerun); a ValueError is not cached and is raised again."""
+    return PL.read_band_files(list(files))
+
+
 # ---------------------------------------------------------------- input
 
 st.header('Đầu vào: một ô ảnh 5 dải phổ')
@@ -110,7 +115,7 @@ else:
         ui.footer()
         st.stop()
     try:
-        x_full, tile_id = PL.read_band_files([(f.name, f.getvalue()) for f in files])
+        x_full, tile_id = read_upload(tuple((f.name, f.getvalue()) for f in files))
         x, cropped = PL.fit_tile(x_full)
     except ValueError as e:
         st.error(str(e))
@@ -161,7 +166,7 @@ except Exception as err:  # a damaged checkpoint, or too little memory
     st.stop()
 p_weed = probs[2]
 pred3 = probs.argmax(0).astype(np.uint8)
-ui.show(F.segmentation_views(rgb, true3, pred3, p_weed))
+ui.figure('segmentation_views', rgb, true3, pred3, p_weed)
 m1, m2, m3 = st.columns(3)
 m1.metric('Thời gian chạy mô hình', f'{ui.num(seconds, 1)} giây', border=True, help='Lần chạy đầu tiên cho ô ảnh này; '
           'kết quả được giữ lại nên lần sau hiện ngay.')
@@ -200,7 +205,7 @@ if split is not None and C.tile_date(tile_id) not in C.SCOPES[C.PRIMARY['scope']
                'cho đợt bay này.')
 left, right = st.columns([3, 2])
 with left:
-    ui.show(F.tile_decisions(rgb, cells, 'decision', CELL, TAU, f'{tile_id}: quyết định của hệ thống'))
+    ui.figure('tile_decisions', rgb, cells, 'decision', CELL, TAU, f'{tile_id}: quyết định của hệ thống')
 with right:
     counts = cells['decision'].value_counts()
     k1, k2, k3 = st.columns(3)
@@ -320,7 +325,7 @@ st.markdown('\n'.join(f'- {line}' for line in lines))
 k_not = int(np.nan_to_num(k_not_v, nan=n_cell_patches))
 k_no = int(np.nan_to_num(k_no_v, nan=n_cell_patches))
 panel_row = pd.Series({'tile': tile_id, 'cell': k, 'patches': patches if isinstance(patches, str) else ''})
-ui.show(F.cell_panels(rgb, true3, p_weed, panel_row, colour, k_not, k_no))
+ui.figure('cell_panels', rgb, true3, p_weed, panel_row, colour, k_not, k_no)
 if decision != C.NO_SPRAY:
     st.caption('Viền liền: các vùng cần bỏ để ô hết PHUN; viền đứt: các vùng bỏ thêm để thành KHÔNG PHUN. Số trên hình là '
                'thứ tự bỏ (vùng nhiều cỏ dự đoán nhất trước).')
@@ -343,7 +348,7 @@ if decision != C.NO_SPRAY:
                 'ảnh (thay bằng đất trống) rồi cho mô hình chấm lại từng bước.')
     if checked is not None:
         if np.isfinite([k_not_v, k_no_v]).all():
-            ui.show(F.removal_curve(checked, check_steps))
+            ui.figure('removal_curve', checked, check_steps)
         st.success(check_message(checked, check_source), icon=':material/verified:')
         if colab_cf is not None:
             st.caption('Nguồn: `results/weeds_cfcheck/` (cùng mô hình, cùng quyết định với ô này).')
@@ -362,12 +367,12 @@ if decision != C.NO_SPRAY:
         steps_est = PL.estimate_steps(p_weed, k, row['lam_lo'], row['lam_hi']).iloc[:max(k_no + 8, 2 * k_no + 2)]
         c_est = {'decision_rescored': decision, 'k_not_spray_model': k_not, 'k_no_spray_model': k_no,
                  'lam_lo': row['lam_lo'], 'lam_hi': row['lam_hi']}
-        ui.show(F.removal_curve(pd.Series(c_est), steps_est, estimate_only=True))
+        ui.figure('removal_curve', pd.Series(c_est), steps_est, estimate_only=True)
 
 
 def show_attributions(ig_map, cam_map, band_score, total_score, gap_score, source):
     """IG and Grad-CAM over the tile, and IG per band in cm^2 of predicted weed (scores times the cell area)."""
-    ui.show(F.attribution_panels(rgb, ig_map, cam_map, k, colour))
+    ui.figure('attribution_panels', rgb, ig_map, cam_map, k, colour)
     bands = pd.DataFrame({'band': list(C.BANDS), 'cm2': np.asarray(band_score) * CELL_CM2})
     bands['text'] = [('+' if v >= 0 else '−') + ui.num(abs(v), 1) for v in bands['cm2']]
     base = alt.Chart(bands).encode(y=alt.Y('band:N', sort=list(C.BANDS), title=None),

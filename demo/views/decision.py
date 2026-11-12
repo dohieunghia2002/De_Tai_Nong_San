@@ -8,7 +8,6 @@ import pandas as pd
 import streamlit as st
 
 import core as C
-import figures as F
 import ui
 
 ui.need_data()
@@ -158,8 +157,9 @@ with st.spinner('Đang đọc ảnh…'):
         panels[(C.tile_date(tile_id), loc[tile_id])] = (ui.thumbnail(tile_id), g[policy].to_numpy(),
                                                         g['need'].to_numpy())
 fold_of_loc = {loc[t]: f for t, f in zip(cells['tile'], cells['fold'])}
-ui.show(F.field_overview(panels, dates, max(loc.values()), cell,
-                         lambda j: f'Vị trí {j}' + (f' · phần {fold_of_loc[j]}' if j in fold_of_loc else '')))
+n_loc = max(loc.values())
+titles = {j: f'Vị trí {j}' + (f' · phần {fold_of_loc[j]}' if j in fold_of_loc else '') for j in range(1, n_loc + 1)}
+ui.figure('field_overview', panels, dates, n_loc, cell, titles)
 st.caption('Mỗi cột là một vị trí trên ruộng (1,5 m × 1,5 m), mỗi hàng là một đợt bay, nên đọc theo cột thấy cỏ ở '
            'cùng một chỗ thay đổi qua thời gian. Dấu X: quyết định sai so với nhãn (ô KHÔNG PHUN mà cần phun là bỏ sót; '
            'ô PHUN mà không cần là phun nhầm). Ô CHƯA CHẮC không tính là sai vì người sẽ ra xem.')
@@ -170,8 +170,8 @@ tile_id = st.selectbox('Ô ảnh', tiles, format_func=lambda t: f'{t} · vị tr
 g = cells[cells['tile'] == tile_id]
 left, right = st.columns([3, 2])
 with left:
-    ui.show(F.tile_decisions(ui.rgb(tile_id), g, policy, cell, tau,
-                             f'{tile_id}: "máy thấy" = lượng cỏ dự đoán, "nhãn thật" = cỏ theo nhãn'))
+    ui.figure('tile_decisions', ui.rgb(tile_id), g, policy, cell, tau,
+              f'{tile_id}: "máy thấy" = lượng cỏ dự đoán, "nhãn thật" = cỏ theo nhãn')
 with right:
     view = pd.DataFrame({'Ô': g['cell'] + 1, 'Quyết định': [C.DECISION_VI[int(d)] for d in g[policy]],
                          'Cỏ dự đoán': [ui.pct(v, 2) for v in g['s']], 'Cỏ theo nhãn': [ui.pct(v, 2) for v in g['w']],
@@ -224,7 +224,7 @@ for k in C.available_models():
         continue
     mm = r[1].set_index('policy')
     a, b = mm.loc['conformal_3way'], mm.loc['plug_in']
-    seg = C.read_json(C.model_dir(k) / 'segmentation_metrics.json')['test']['miou']
+    seg = C.test_iou(k)['miou']
     rows.append({'Mô hình phân vùng': C.MODELS[k]['label'], 'mIoU test (%)': ui.num(seg, 2),
                  'Đề tài: giảm phun': ui.pct(a['spray_reduction']), 'Đề tài: chưa chắc': ui.pct(a['deferred']),
                  'Đề tài: bỏ sót': ui.pct(a['missed_need_rate']) + flag(a['missed_need_rate'], alpha),
