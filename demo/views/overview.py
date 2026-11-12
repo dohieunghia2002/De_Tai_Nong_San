@@ -78,8 +78,12 @@ names = {'C1_test_miou': 'C1. Tìm cỏ: mIoU trên tập kiểm tra (%)', 'C2_s
 rows = []
 for k, ch in go['checks'].items():
     v = ch['value']
-    rows.append({'Tiêu chí': names.get(k, k), 'Kết quả': ui.num(v, 2) if k == 'C1_test_miou' else ui.pct(v),
-                 'Yêu cầu': ch['required'].replace('.', ','), 'Đạt': '✅ đạt' if ch['pass'] else '❌ chưa đạt'})
+    op, bound = ch['required'].split()  # e.g. '>= 0.3': written in the unit of the result next to it (30%, not 0,3)
+    sign = {'>=': '≥', '<=': '≤'}.get(op, op)
+    miou = k == 'C1_test_miou'
+    rows.append({'Tiêu chí': names.get(k, k), 'Kết quả': ui.num(v, 2) if miou else ui.pct(v),
+                 'Yêu cầu': f'{sign} {ui.num(float(bound), 2) if miou else ui.pct(float(bound), 0)}',
+                 'Đạt': '✅ đạt' if ch['pass'] else '❌ chưa đạt'})
 st.dataframe(rows, hide_index=True)
 st.caption(f'Kết luận: **{go["verdict"]}** (nguồn: `results/{C.MODELS[main]["dir"]}/go_no_go.json`). C1 yêu cầu '
            'mIoU không thấp hơn số của bài báo quá 5 điểm.')

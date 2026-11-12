@@ -13,17 +13,18 @@ st.markdown('Bộ dữ liệu công khai, công bố tại hội nghị **IEEE/C
 
 left, right = st.columns([3, 2])
 with left:
-    st.dataframe(pd.DataFrame([
-        ('Nơi chụp', 'Ruộng ngô ở Potsdam (Đức), năm 2023'),
-        ('Cách chụp', 'Drone DJI P4 Multispectral bay ở độ cao 5 m; mỗi điểm ảnh ứng với 2,5 mm ngoài ruộng'),
-        ('Ảnh', 'Ô ảnh 600 × 600 điểm ảnh (1,5 m × 1,5 m), 5 dải phổ: đỏ (R), lục (G), lam (B), cận hồng ngoại '
-                '(NIR), rìa đỏ (RE); ảnh 16 bit'),
-        ('Thời gian', '4 đợt bay: 25/5, 30/5, 6/6, 15/6. Ruộng được phun thuốc trừ cỏ ngày 12/6'),
-        ('Nhãn', 'Từng điểm ảnh: nền đất, ngô, và 4 lớp cỏ (dền, cỏ lồng vực, cúc dại, cỏ khác). Đề tài gộp các '
-                 'loài cỏ thành một lớp "cỏ dại", như bài báo gốc'),
-        ('Nhãn "cần phun"', 'Không có sẵn: suy ra từ nhãn, một ô cần phun nếu cỏ chiếm từ τ diện tích ô trở lên '
-                            '(τ = 1%, chỉ minh họa)'),
-    ], columns=['', 'Mô tả']), hide_index=True)
+    # a markdown table wraps long text; a dataframe cut it off
+    st.markdown(
+        '| | |\n|---|---|\n'
+        '| **Nơi chụp** | Ruộng ngô ở Potsdam (Đức), năm 2023 |\n'
+        '| **Cách chụp** | Drone DJI P4 Multispectral bay ở độ cao 5 m; mỗi điểm ảnh ứng với 2,5 mm ngoài ruộng |\n'
+        '| **Ảnh** | Ô ảnh 600 × 600 điểm ảnh (1,5 m × 1,5 m), 5 dải phổ: đỏ (R), lục (G), lam (B), cận hồng ngoại '
+        '(NIR), rìa đỏ (RE); ảnh 16 bit |\n'
+        '| **Thời gian** | 4 đợt bay: 25/5, 30/5, 6/6, 15/6. Ruộng được phun thuốc trừ cỏ ngày 12/6 |\n'
+        '| **Nhãn** | Từng điểm ảnh: nền đất, ngô, và 4 lớp cỏ (dền, cỏ lồng vực, cúc dại, cỏ khác). Đề tài gộp các '
+        'loài cỏ thành một lớp "cỏ dại", như bài báo gốc |\n'
+        '| **Nhãn "cần phun"** | Không có sẵn: suy ra từ nhãn, một ô cần phun nếu cỏ chiếm từ τ diện tích ô trở lên '
+        '(τ = 1%, chỉ minh họa) |')
 with right:
     ids = ui.dataset_ids()
     split_vi = {'train': 'Huấn luyện (train)', 'val': 'Chọn mô hình (val)', 'test': 'Kiểm tra (test)'}
@@ -31,7 +32,8 @@ with right:
                            for s in C.SPLITS}).reindex(list(C.DATES)).fillna(0).astype(int)
     counts.index = [C.date_vi(d + '_') for d in counts.index]
     counts.loc['Tổng'] = counts.sum()
-    st.dataframe(counts)
+    counts.index.name = 'Đợt bay'
+    st.table(counts)  # wraps its headers, so all three splits fit the narrow column
     st.caption('Số ô ảnh theo đợt bay và tập, đếm từ file chia tập của tác giả (giữ nguyên, không chia lại). Tập '
                'được chia theo vị trí trên ruộng.')
 

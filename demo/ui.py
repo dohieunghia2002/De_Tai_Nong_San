@@ -43,10 +43,29 @@ def _figure_png(name, args, kwargs):
     return buf.getvalue()
 
 
-def figure(name, *args, **kwargs):
+def figure(name, *args, width='stretch', **kwargs):
     """Show figures.<name>(*args, **kwargs). Each figure is drawn once per distinct input and kept as a PNG: a rerun
-    caused by another widget (choosing a cell, moving a slider) shows it again at once instead of drawing it anew."""
-    st.image(_figure_png(name, args, kwargs), width='stretch')
+    caused by another widget (choosing a cell, moving a slider) shows it again at once instead of drawing it anew.
+    width='content' shows a small figure at its own size (no larger than the column) instead of stretching it."""
+    st.image(_figure_png(name, args, kwargs), width=width)
+
+
+def band_chart(values, x_title, digits=1, suffix='', height=220, extra_tooltip=None):
+    """One horizontal bar per band with its value written at the end of the bar (left of a negative bar); the axis
+    leaves room for the labels so none is cut. values: one number per band, in BANDS order."""
+    import altair as alt
+    d = pd.DataFrame({'band': list(C.BANDS), 'value': np.asarray(values, dtype=float)})
+    d['text'] = [('+' if v >= 0 else '−') + num(abs(float(v)), digits) + suffix for v in d['value']]
+    lo, hi = min(float(d['value'].min()), 0.0), max(float(d['value'].max()), 0.0)
+    pad = 0.25 * ((hi - lo) or 1.0)
+    base = alt.Chart(d).encode(
+        y=alt.Y('band:N', sort=list(C.BANDS), title=None, axis=alt.Axis(labelFontSize=12)),
+        x=alt.X('value:Q', title=x_title, scale=alt.Scale(domain=[lo - (pad if lo < 0 else 0), hi + pad], nice=False)))
+    tips = [alt.Tooltip('band:N', title='dải'), alt.Tooltip('text:N', title='giá trị')] + (extra_tooltip or [])
+    bars = base.mark_bar(color='#2a78d6', cornerRadiusEnd=4, size=22).encode(tooltip=tips)
+    pos = base.transform_filter('datum.value >= 0').mark_text(align='left', dx=4, color='#0b0b0b').encode(text='text:N')
+    neg = base.transform_filter('datum.value < 0').mark_text(align='right', dx=-4, color='#0b0b0b').encode(text='text:N')
+    st.altair_chart((bars + pos + neg).properties(height=height), width='stretch')
 
 
 def need_data():

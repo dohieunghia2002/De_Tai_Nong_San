@@ -1,9 +1,7 @@
 """Explanation of one cell's decision: why (predicted weed against the thresholds), what would change it (the
 counterfactual as the model rescored it on Colab), which bands drive it (integrated gradients) and the attribution
 maps. Exists for the main model at the primary setting, the decisions the Colab runs explained."""
-import altair as alt
 import numpy as np
-import pandas as pd
 import streamlit as st
 
 import core as C
@@ -108,20 +106,12 @@ else:
                    'vùng trên Colab trùng với thứ tự tính trên máy này.')
     except ValueError as e:
         st.error(f'Dữ liệu không nhất quán: {e}')
+    ui.figure('removal_curve', row, st_steps, width='content')
+    st.markdown('**Dải phổ nào đẩy lượng cỏ dự đoán lên** (IG so với ảnh đất trống)')
     left, right = st.columns([3, 2])
     with left:
-        ui.figure('removal_curve', row, st_steps)
+        ui.band_chart([row[f'ig_{b}'] * CELL_CM2 for b in C.BANDS], 'đóng góp vào lượng cỏ dự đoán của ô (cm²)')
     with right:
-        bands = pd.DataFrame({'band': list(C.BANDS), 'cm2': [row[f'ig_{b}'] * CELL_CM2 for b in C.BANDS]})
-        bands['text'] = [('+' if v >= 0 else '−') + ui.num(abs(v), 1) for v in bands['cm2']]
-        base = alt.Chart(bands).encode(
-            y=alt.Y('band:N', sort=list(C.BANDS), title=None),
-            x=alt.X('cm2:Q', title='đóng góp vào lượng cỏ dự đoán (cm²)'))
-        chart = (base.mark_bar(color='#2a78d6', cornerRadiusEnd=4, size=22).encode(
-            tooltip=[alt.Tooltip('band:N', title='dải'), alt.Tooltip('cm2:Q', title='cm²', format='.1f')])
-                 + base.mark_text(align='left', dx=4, color='#0b0b0b').encode(text='text:N'))
-        st.markdown('**Dải phổ nào đẩy lượng cỏ dự đoán lên** (IG so với ảnh đất trống)')
-        st.altair_chart(chart.properties(height=230), width='stretch')
         st.caption(f'Tổng các dải ≈ lượng cỏ dự đoán của ô ({ui.num(row["ig_sum"] * CELL_CM2, 1)} cm²), vì ảnh đất '
                    'trống có lượng cỏ dự đoán gần 0. IG trả lời "vì sao là cỏ mà không phải đất", không trả lời "vì sao '
                    'là cỏ mà không phải ngô".')

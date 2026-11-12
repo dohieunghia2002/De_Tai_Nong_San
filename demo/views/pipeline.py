@@ -3,7 +3,6 @@
 gradients) run only on request, with their expected time shown first."""
 import hashlib
 
-import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -166,7 +165,8 @@ except Exception as err:  # a damaged checkpoint, or too little memory
     st.stop()
 p_weed = probs[2]
 pred3 = probs.argmax(0).astype(np.uint8)
-ui.figure('segmentation_views', rgb, true3, pred3, p_weed)
+# without a label the figure has 3 panels, narrower than the page: shown at its own size rather than stretched
+ui.figure('segmentation_views', rgb, true3, pred3, p_weed, width='stretch' if true3 is not None else 'content')
 m1, m2, m3 = st.columns(3)
 m1.metric('Thời gian chạy mô hình', f'{ui.num(seconds, 1)} giây', border=True, help='Lần chạy đầu tiên cho ô ảnh này; '
           'kết quả được giữ lại nên lần sau hiện ngay.')
@@ -211,14 +211,6 @@ with right:
     k1, k2, k3 = st.columns(3)
     for col, d in zip((k1, k2, k3), (C.SPRAY, C.DEFER, C.NO_SPRAY)):
         col.metric(C.DECISION_VI[d], f'{int(counts.get(d, 0))} ô', border=True)
-    view = {'Ô': cells['cell'] + 1, 'Cỏ dự đoán': [f'{ui.num(s * CELL_CM2, 1)} cm² ({ui.pct(s, 2)})' for s in cells['s']],
-            'Quyết định': [C.DECISION_VI[int(d)] for d in cells['decision']]}
-    if mask is not None:
-        view['Cỏ theo nhãn'] = [ui.pct(w, 2) for w in cells['w']]
-        view['Kết quả'] = ['bỏ sót' if d == C.NO_SPRAY and n else 'phun nhầm' if d == C.SPRAY and not n
-                           else 'người ra xem' if d == C.DEFER else 'đúng'
-                           for d, n in zip(cells['decision'], cells['need'])]
-    st.dataframe(pd.DataFrame(view), hide_index=True)
     st.caption('Ô đánh số từ trái sang phải, trên xuống dưới. Ô CHƯA CHẮC: người ra xem, cần thì phun.')
     if thr['how'] == 'crossfit':
         saved = pd.read_csv(C.RESULTS / 'weeds_xai/decisions.csv')
@@ -226,6 +218,16 @@ with right:
         same = int((cells.set_index('cell')['decision'] == saved).sum())
         st.caption(f':material/check_circle: Trùng quyết định đã báo cáo ở {same}/{len(saved)} ô '
                    '(`results/weeds_xai/decisions.csv`).')
+# the table below the figure, over the full width: in the side column its last columns were cut off
+view = {'Ô': cells['cell'] + 1, 'Quyết định': [C.DECISION_VI[int(d)] for d in cells['decision']],
+        'Cỏ dự đoán': [f'{ui.num(s * CELL_CM2, 1)} cm² ({ui.pct(s, 2)})' for s in cells['s']]}
+if mask is not None:
+    view['Cỏ theo nhãn'] = [f'{ui.num(w * CELL_CM2, 1)} cm² ({ui.pct(w, 2)})' for w in cells['w']]
+    view['Cần phun?'] = np.where(cells['need'], 'có', 'không')
+    view['Kết quả'] = ['bỏ sót' if d == C.NO_SPRAY and n else 'phun nhầm' if d == C.SPRAY and not n
+                       else 'người ra xem' if d == C.DEFER else 'đúng'
+                       for d, n in zip(cells['decision'], cells['need'])]
+st.dataframe(pd.DataFrame(view), hide_index=True)
 
 
 # ---------------------------------------------------------------- 3. explanations
@@ -348,7 +350,7 @@ if decision != C.NO_SPRAY:
                 'ảnh (thay bằng đất trống) rồi cho mô hình chấm lại từng bước.')
     if checked is not None:
         if np.isfinite([k_not_v, k_no_v]).all():
-            ui.figure('removal_curve', checked, check_steps)
+            ui.figure('removal_curve', checked, check_steps, width='content')
         st.success(check_message(checked, check_source), icon=':material/verified:')
         if colab_cf is not None:
             st.caption('Nguồn: `results/weeds_cfcheck/` (cùng mô hình, cùng quyết định với ô này).')
@@ -367,25 +369,19 @@ if decision != C.NO_SPRAY:
         steps_est = PL.estimate_steps(p_weed, k, row['lam_lo'], row['lam_hi']).iloc[:max(k_no + 8, 2 * k_no + 2)]
         c_est = {'decision_rescored': decision, 'k_not_spray_model': k_not, 'k_no_spray_model': k_no,
                  'lam_lo': row['lam_lo'], 'lam_hi': row['lam_hi']}
-        ui.figure('removal_curve', pd.Series(c_est), steps_est, estimate_only=True)
+        ui.figure('removal_curve', pd.Series(c_est), steps_est, estimate_only=True, width='content')
 
 
 def show_attributions(ig_map, cam_map, band_score, total_score, gap_score, source):
     """IG and Grad-CAM over the tile, and IG per band in cm^2 of predicted weed (scores times the cell area)."""
     ui.figure('attribution_panels', rgb, ig_map, cam_map, k, colour)
-    bands = pd.DataFrame({'band': list(C.BANDS), 'cm2': np.asarray(band_score) * CELL_CM2})
-    bands['text'] = [('+' if v >= 0 else '−') + ui.num(abs(v), 1) for v in bands['cm2']]
-    base = alt.Chart(bands).encode(y=alt.Y('band:N', sort=list(C.BANDS), title=None),
-                                   x=alt.X('cm2:Q', title='đóng góp vào lượng cỏ dự đoán của ô (cm²)'))
+    cm2 = np.asarray(band_score, dtype=float) * CELL_CM2
     a, b = st.columns([3, 2])
     with a:
-        st.altair_chart((base.mark_bar(color='#2a78d6', cornerRadiusEnd=4, size=22).encode(
-            tooltip=[alt.Tooltip('band:N', title='dải'), alt.Tooltip('cm2:Q', title='cm²', format='.1f')])
-            + base.mark_text(align='left', dx=4, color='#0b0b0b').encode(text='text:N')).properties(height=220),
-            width='stretch')
+        ui.band_chart(cm2, 'đóng góp vào lượng cỏ dự đoán của ô (cm²)')
     with b:
-        top = bands.sort_values('cm2', ascending=False).iloc[0]
-        st.markdown(f'Dải **{top["band"]}** đẩy lượng cỏ dự đoán lên nhiều nhất ({ui.num(top["cm2"], 1)} cm²).')
+        top = int(np.argmax(cm2))
+        st.markdown(f'Dải **{C.BANDS[top]}** đẩy lượng cỏ dự đoán lên nhiều nhất ({ui.num(cm2[top], 1)} cm²).')
         st.caption(f'Tổng các dải {ui.num(total_score * CELL_CM2, 1)} cm²; lượng cỏ dự đoán của ô so với ảnh đất trống '
                    f'{ui.num(gap_score * CELL_CM2, 1)} cm² (hai số phải gần bằng nhau). {source} IG trả lời "vì sao là '
                    'cỏ mà không phải đất", không trả lời "vì sao là cỏ mà không phải ngô".')

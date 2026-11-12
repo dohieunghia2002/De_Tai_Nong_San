@@ -35,11 +35,11 @@ IMAGES = ROOT_DIR / 'data/weedsgalore'  # preview images and figures made by scr
 
 # Segmentation models whose probability maps are saved; 'batch' is documented in CLAUDE.md where train_done.json
 # predates the field.
-MODELS = {
-    'authors_msi': {'label': 'Tác giả, ảnh 5 dải phổ (mô hình chính)', 'dir': 'weeds_authors/dlv3p_msi_3'},
-    'authors_rgb': {'label': 'Tác giả, chỉ ảnh màu RGB', 'dir': 'weeds_authors/dlv3p_rgb_3'},
-    'own_b8': {'label': 'Đề tài tự huấn luyện, lần 2 (batch 8)', 'dir': 'weeds_pilot_b8', 'batch': 8},
-    'own_b2': {'label': 'Đề tài tự huấn luyện, lần 1 (batch 2)', 'dir': 'weeds_pilot', 'batch': 2},
+MODELS = {  # labels short enough for the sidebar's select box
+    'authors_msi': {'label': 'Tác giả, 5 dải phổ (chính)', 'dir': 'weeds_authors/dlv3p_msi_3'},
+    'authors_rgb': {'label': 'Tác giả, chỉ ảnh RGB', 'dir': 'weeds_authors/dlv3p_rgb_3'},
+    'own_b8': {'label': 'Đề tài, lần 2 (batch 8)', 'dir': 'weeds_pilot_b8', 'batch': 8},
+    'own_b2': {'label': 'Đề tài, lần 1 (batch 2)', 'dir': 'weeds_pilot', 'batch': 2},
 }
 MAIN_MODEL = 'authors_msi'
 POLICIES = ('conformal_3way', 'plug_in', 'conformal_miss_only', 'oracle', 'broadcast')
@@ -52,7 +52,7 @@ POLICY_VI = {
 }
 DECISION_VI = {d: name for d, (name, _) in CF.DECISION.items()}
 DECISION_COLOR = {d: colour for d, (_, colour) in CF.DECISION.items()}
-SCOPE_VI = {'pre-herbicide pooled': 'Gộp 3 đợt bay trước ngày phun thuốc (25/5, 30/5, 6/6)',
+SCOPE_VI = {'pre-herbicide pooled': 'Gộp 25/5, 30/5, 6/6 (chính)',  # the 3 flights before spraying; fits the sidebar
             **{d: f'Riêng đợt bay {date_vi(d + "_")[:5]}' for d in DATES}}
 CALIBRATION_VI = {CAL_TEST_2FOLD: 'Chéo 2 phần theo vị trí trên tập kiểm tra (phương án chính)',
                   CAL_VAL: 'Tập kiểm định val (đã dùng để chọn mô hình, phương án phụ)'}

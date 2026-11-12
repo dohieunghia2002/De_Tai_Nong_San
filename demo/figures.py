@@ -35,8 +35,12 @@ def clean(ax):
     CF.clean_axes(ax)
 
 
-def legend_patches(fig, items, y=0.0, ncol=None, fontsize=10, wrong=None):
-    """Colour boxes for (text, colour) items; `wrong` adds the X mark of a wrong decision with that text."""
+DPI = 100  # figures are drawn about as wide as the page shows them (1000-1300 px), so their text is not shrunk
+
+
+def legend_patches(fig, items, y=0.0, ncol=None, fontsize=11, wrong=None):
+    """Colour boxes for (text, colour) items, hanging below y (figure coordinates; the figure is saved with a tight
+    box, so a legend below the axes is kept); `wrong` adds the X mark of a wrong decision with that text."""
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
     handles = [Patch(facecolor=np.asarray(c) / 255 if not isinstance(c, str) else c, edgecolor='#c3c2b7', label=t)
@@ -44,8 +48,8 @@ def legend_patches(fig, items, y=0.0, ncol=None, fontsize=10, wrong=None):
     if wrong:
         handles.append(Line2D([], [], marker='X', color='white', markeredgecolor='black', markeredgewidth=1.2,
                               markersize=11, linestyle='None', label=wrong))
-    fig.legend(handles=handles, loc='lower center', ncol=ncol or len(handles), frameon=False, fontsize=fontsize,
-               bbox_to_anchor=(0.5, y))
+    fig.legend(handles=handles, loc='upper center', ncol=ncol or len(handles), frameon=False, fontsize=fontsize,
+               bbox_to_anchor=(0.5, y), columnspacing=1.6, handletextpad=0.5)
 
 
 def grid_lines(ax, cell, colour='white', lw=1):
@@ -58,18 +62,18 @@ def grid_lines(ax, cell, colour='white', lw=1):
 
 def tile_views(x, mask, lo, hi):
     """True colour, NIR false colour, red edge alone and the 6-class label of one tile."""
-    fig, axs = plt.subplots(1, 4, figsize=(16, 4.6), dpi=90)
+    fig, axs = plt.subplots(1, 4, figsize=(12, 3.6), dpi=DPI)
     red_edge = C.BANDS.index('RE')
     views = ((C.composite(x, (C.R, C.G, C.B), lo, hi), 'Ảnh màu thật (R, G, B)'),
-             (C.composite(x, (C.NIR, C.R, C.G), lo, hi), 'Ảnh màu giả (NIR, R, G)\nthực vật hiện màu đỏ'),
+             (C.composite(x, (C.NIR, C.R, C.G), lo, hi), 'Ảnh màu giả (NIR, R, G):\nthực vật hiện màu đỏ'),
              (C.composite(x, (red_edge,) * 3, lo, hi), 'Dải rìa đỏ (RE)'),
              (np.array([c for _, c in C.CLASSES], dtype=np.uint8)[mask], 'Nhãn của tác giả (6 lớp)'))
     for ax, (img, title) in zip(axs, views):
         ax.imshow(img)
-        ax.set_title(title, fontsize=11, color=INK2)
+        ax.set_title(title, fontsize=12.5, color=INK2)
         clean(ax)
-    legend_patches(fig, [(t, c) for t, c in C.CLASSES], y=-0.02, ncol=6)
-    fig.subplots_adjust(left=0.01, right=0.99, top=0.86, bottom=0.1, wspace=0.05)
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.86, bottom=0.03, wspace=0.05)
+    legend_patches(fig, [(t, c) for t, c in C.CLASSES], y=0.02, ncol=3, fontsize=11.5)
     return fig
 
 
@@ -91,20 +95,21 @@ def segmentation_views(rgb, true3, pred3, p_weed):
     else:
         panels = ((rgb, 'Ảnh màu thật'), (SEG3[true3], 'Nhãn thật (3 lớp)'), (SEG3[pred3], 'Mô hình dự đoán'),
                   (None, 'Xác suất cỏ của mô hình'), (error_map(pred3, true3), 'Chỗ mô hình sai'))
-    fig, axs = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4.9), dpi=85)
+    fig, axs = plt.subplots(1, len(panels), figsize=(2.5 * len(panels), 3.0), dpi=DPI)
     for ax, (img, title) in zip(axs, panels):
         if img is None:
             im = ax.imshow(p_weed.astype(np.float32), cmap='Reds', vmin=0, vmax=1, interpolation='nearest')
             cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.02, ticks=[0, 0.5, 1])
             cb.ax.set_yticklabels(['0', '0,5', '1'])
+            cb.ax.tick_params(labelsize=10.5)
             cb.outline.set_visible(False)
         else:
             ax.imshow(img, interpolation='nearest')
-        ax.set_title(title, fontsize=11, color=INK2)
+        ax.set_title(title, fontsize=12.5, color=INK2)
         clean(ax)
     items = list(zip(SEG3_VI, SEG3)) + ([] if true3 is None else list(ERRORS))
-    legend_patches(fig, items, y=-0.02, ncol=len(items))
-    fig.subplots_adjust(left=0.01, right=0.98, top=0.88, bottom=0.1, wspace=0.08)
+    fig.subplots_adjust(left=0.01, right=0.98, top=0.88, bottom=0.03, wspace=0.08)
+    legend_patches(fig, items, y=0.02, fontsize=11)  # one row: fits, and keeps the classes and the errors in order
     return fig
 
 
@@ -153,28 +158,28 @@ DECISION_LEGEND = [(C.DECISION_VI[d], C.DECISION_COLOR[d]) for d in (C.SPRAY, C.
 def field_overview(panels, dates, n_locations, cell, titles):
     """Rows: flight dates; columns: field locations. panels[(date, location)] = (rgb thumbnail, decisions, need);
     titles[location] = column title."""
-    fig, axs = plt.subplots(len(dates), n_locations, figsize=(2.05 * n_locations, 2.25 * len(dates) + 0.7), dpi=90,
-                            squeeze=False)
+    fig, axs = plt.subplots(len(dates), n_locations, figsize=(1.62 * n_locations, 1.7 * len(dates) + 0.45),
+                            dpi=DPI, squeeze=False)
     for i, date in enumerate(dates):
         for j in range(n_locations):
             ax = axs[i][j]
             clean(ax)
+            if i == 0:
+                ax.set_title(titles[j + 1], fontsize=10.5, color=INK2)
+            if j == 0:
+                ax.set_ylabel(C.date_vi(date + '_')[:5], fontsize=12, color=INK2, rotation=0, ha='right',
+                              va='center', labelpad=8)
             p = panels.get((date, j + 1))
             if p is None:
-                ax.text(0.5, 0.5, 'không có ảnh', ha='center', va='center', color=INK2, fontsize=9,
+                ax.text(0.5, 0.5, 'không có ảnh', ha='center', va='center', color=INK2, fontsize=10,
                         transform=ax.transAxes)
                 continue
             rgb, dec, need = p
             scale = C.TILE / rgb.shape[0]
             ax.imshow(_tinted(rgb, dec, cell, 0.32), interpolation='bilinear')
             _cell_marks(ax, dec, need, cell, scale, lw=1.6)
-            if i == 0:
-                ax.set_title(titles[j + 1], fontsize=10, color=INK2)
-            if j == 0:
-                ax.set_ylabel(C.date_vi(date + '_')[:5], fontsize=11, color=INK2, rotation=0, ha='right',
-                              va='center', labelpad=8)
-    legend_patches(fig, DECISION_LEGEND, y=0.0, fontsize=10, wrong='quyết định sai so với nhãn')
-    fig.subplots_adjust(left=0.05, right=0.995, top=0.9, bottom=0.1, wspace=0.04, hspace=0.06)
+    fig.subplots_adjust(left=0.05, right=0.995, top=0.9, bottom=0.04, wspace=0.04, hspace=0.06)
+    legend_patches(fig, DECISION_LEGEND, y=0.03, fontsize=11.5, wrong='quyết định sai so với nhãn')
     return fig
 
 
@@ -199,8 +204,8 @@ def tile_decisions(rgb, rows, policy, cell, tau, title):
                 fontsize=8 if small else 9.5, color='white', fontweight='bold', path_effects=HALO, linespacing=1.4)
     ax.set_title(title, fontsize=11.5, color=INK2)
     clean(ax)
-    legend_patches(fig, DECISION_LEGEND, y=0.0, ncol=4, fontsize=9.5, wrong='sai so với nhãn' if labelled else None)
-    fig.subplots_adjust(left=0.01, right=0.99, top=0.93, bottom=0.06)
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.93, bottom=0.03)
+    legend_patches(fig, DECISION_LEGEND, y=0.025, ncol=4, fontsize=10.5, wrong='sai so với nhãn' if labelled else None)
     return fig
 
 
@@ -219,7 +224,7 @@ def cell_panels(rgb, true3, p_weed_tile, c, colour, k_solid, k_dashed):
     boxes = CF.patch_boxes(c) if isinstance(c.get('patches'), str) and c['patches'] else []
     number = k_dashed <= CF.NUMBERED
     n = 3 if true3 is None else 4
-    fig, axs = plt.subplots(1, n, figsize=(4.25 * n, 4.7), dpi=90, gridspec_kw={'width_ratios': [1, 1, 1.12, 1][:n]})
+    fig, axs = plt.subplots(1, n, figsize=(3.1 * n, 3.55), dpi=DPI, gridspec_kw={'width_ratios': [1, 1, 1.12, 1][:n]})
     ax = axs[0]
     ax.imshow(rgb)
     grid_lines(ax, cell)
@@ -228,22 +233,22 @@ def cell_panels(rgb, true3, p_weed_tile, c, colour, k_solid, k_dashed):
     ax.add_patch(box)
     dated = re.match(r'\d{4}-\d{2}-\d{2}', str(c['tile']))
     ax.set_title(f'Ô ảnh {c["tile"]} (1,5 m × 1,5 m)\n' + (f'bay ngày {C.date_vi(c["tile"])}, ' if dated else '')
-                 + f'ô {int(c["cell"]) + 1}', fontsize=10.5, color=INK2)
+                 + f'ô {int(c["cell"]) + 1}', fontsize=11.5, color=INK2)
     ax = axs[1]
     ax.imshow(np.asarray(rgb)[sl])
     CF.draw_patches(ax, boxes, k_solid, k_dashed, number=number)
-    ax.set_title('Ô phóng to (50 cm × 50 cm)\nvùng 5 cm × 5 cm mà lời giải thích chỉ ra', fontsize=10.5, color=INK2)
+    ax.set_title('Ô phóng to (50 cm × 50 cm)\nvùng 5 cm × 5 cm mà lời giải thích chỉ ra', fontsize=11.5, color=INK2)
     ax = axs[2]
     im = ax.imshow(p_weed_tile[sl].astype(np.float32), cmap='Reds', vmin=0, vmax=1, interpolation='nearest')
     CF.draw_patches(ax, boxes, k_solid, k_dashed, number=number)
     cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03, ticks=[0, 0.5, 1])
     cb.ax.set_yticklabels(['0', '0,5', '1'])
     cb.outline.set_visible(False)
-    ax.set_title('Xác suất cỏ của mô hình\n(càng đỏ, máy càng chắc là cỏ)', fontsize=10.5, color=INK2)
+    ax.set_title('Xác suất cỏ của mô hình\n(càng đỏ, máy càng chắc là cỏ)', fontsize=11.5, color=INK2)
     if true3 is not None:
         ax = axs[3]
         ax.imshow(SEG3[true3[sl]], interpolation='nearest')
-        ax.set_title('Nhãn thật của ô\n(xám: đất, xanh: ngô, đỏ: cỏ)', fontsize=10.5, color=INK2)
+        ax.set_title('Nhãn thật của ô\n(xám: đất, xanh: ngô, đỏ: cỏ)', fontsize=11.5, color=INK2)
     for a in axs:
         clean(a)
     fig.subplots_adjust(left=0.01, right=0.98, top=0.82, bottom=0.02, wspace=0.12)
@@ -254,7 +259,7 @@ def attribution_panels(rgb, ig, grad_cam, cell_idx, colour):
     """Integrated gradients and Grad-CAM of one cell's decision, over the whole tile, with the cell boxed."""
     cell = C.PRIMARY['cell_size']
     r, col = divmod(int(cell_idx), C.TILE // cell)
-    fig, axs = plt.subplots(1, 3, figsize=(14, 4.9), dpi=90)
+    fig, axs = plt.subplots(1, 3, figsize=(11.5, 4.2), dpi=DPI)
     lim = float(np.abs(ig).max()) or 1.0
     pool = C.TILE / ig.shape[0]
     panels = ((rgb, None, 'Ảnh màu thật', None),
@@ -275,7 +280,7 @@ def attribution_panels(rgb, ig, grad_cam, cell_idx, colour):
         box = Rectangle((col * c - 0.5, r * c - 0.5), c, c, fill=False, edgecolor=colour, linewidth=3)
         box.set_path_effects([pe.withStroke(linewidth=5, foreground='white')])
         ax.add_patch(box)
-        ax.set_title(title, fontsize=10.5, color=INK2)
+        ax.set_title(title, fontsize=12, color=INK2)
         clean(ax)
     fig.subplots_adjust(left=0.01, right=0.99, top=0.84, bottom=0.02, wspace=0.06)
     return fig
@@ -284,11 +289,11 @@ def attribution_panels(rgb, ig, grad_cam, cell_idx, colour):
 def removal_curve(c, steps, estimate_only=False):
     """Predicted weed area of the cell as its ranked patches are removed: the model's rescoring and the fast estimate,
     or the estimate alone (estimate_only: steps carry the estimate in s_model)."""
-    fig, ax = plt.subplots(figsize=(8, 4.2), dpi=90)
-    CF.draw_curve(ax, c, steps, estimate=not estimate_only)
+    fig, ax = plt.subplots(figsize=(8.4, 4.4), dpi=DPI)
+    CF.draw_curve(ax, c, steps, estimate=not estimate_only, fs=10.5, fs_axis=11, fs_tick=10.5)
     second = ('đường liền: ước lượng nhanh (chưa cho mô hình chấm lại)' if estimate_only else
               'đường liền có chấm: mô hình chấm lại · đường đứt: ước lượng nhanh')
-    ax.set_title('Lượng cỏ dự đoán khi bỏ dần từng vùng (vùng nhiều cỏ nhất trước)\n' + second, fontsize=10.5,
+    ax.set_title('Lượng cỏ dự đoán khi bỏ dần từng vùng (vùng nhiều cỏ nhất trước)\n' + second, fontsize=11.5,
                  color=INK2)
     fig.tight_layout()
     return fig

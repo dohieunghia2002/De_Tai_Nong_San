@@ -24,7 +24,8 @@ def reset():
 
 
 def side_cm(cell):
-    return ui.num(cell * C.GSD_CM, 0) + ' cm'
+    side = cell * C.GSD_CM  # 150 px is 37.5 cm: keep the half instead of rounding it to 38
+    return ui.num(side, 0 if float(side).is_integer() else 1) + ' cm'
 
 
 def tau_text(v):
@@ -190,9 +191,13 @@ plot = cells.assign(s_pct=100 * cells['s'], w_pct=100 * cells['w'],
 order = [C.DECISION_VI[d] for d in (C.SPRAY, C.DEFER, C.NO_SPRAY)]
 ticks = [0, 0.1, 0.3, 1, 3, 10, 30, 100]
 scale = alt.Scale(type='symlog', constant=0.1, domain=[0, 100])
+# the default label format rounds 0.1 and 0.3 to "0": write them in full, with a decimal comma
+tick_labels = "replace(format(datum.value, '~g'), '.', ',')"
 points = alt.Chart(plot).mark_circle(size=60, opacity=0.85, stroke='white', strokeWidth=0.8).encode(
-    x=alt.X('s_pct:Q', title='lượng cỏ dự đoán của ô (% diện tích)', scale=scale, axis=alt.Axis(values=ticks)),
-    y=alt.Y('w_pct:Q', title='cỏ theo nhãn (% diện tích)', scale=scale, axis=alt.Axis(values=ticks)),
+    x=alt.X('s_pct:Q', title='lượng cỏ dự đoán của ô (% diện tích)', scale=scale,
+            axis=alt.Axis(values=ticks, labelExpr=tick_labels)),
+    y=alt.Y('w_pct:Q', title='cỏ theo nhãn (% diện tích)', scale=scale,
+            axis=alt.Axis(values=ticks, labelExpr=tick_labels)),
     color=alt.Color('decision:N', title='Quyết định (đề tài)',
                     scale=alt.Scale(domain=order, range=[C.DECISION_COLOR[d] for d in (C.SPRAY, C.DEFER, C.NO_SPRAY)]),
                     legend=alt.Legend(orient='top')),
@@ -231,7 +236,7 @@ for k in C.available_models():
                  'Đề tài: phun nhầm': ui.pct(a['false_spray_rate']) + flag(a['false_spray_rate'], beta),
                  'Ngưỡng cố định: bỏ sót': ui.pct(b['missed_need_rate']) + flag(b['missed_need_rate'], alpha),
                  'Ngưỡng cố định: phun nhầm': ui.pct(b['false_spray_rate']) + flag(b['false_spray_rate'], beta)})
-st.dataframe(pd.DataFrame(rows), hide_index=True)
+st.table(pd.DataFrame(rows).set_index('Mô hình phân vùng'))  # 8 columns: a table wraps them, a dataframe cut them off
 st.caption('Ý chính của tầng quyết định: ngưỡng cố định phụ thuộc vào mô hình. Mô hình nào đoán thiếu cỏ (ví dụ mô '
            'hình chỉ dùng ảnh RGB) thì ngưỡng cố định bỏ sót nhiều; ngưỡng conformal tự điều chỉnh theo mô hình để giữ '
            'mức sai trong giới hạn, đổi lại phải ra xem một số ô. mIoU cao hơn không nhất thiết cho quyết định tốt '

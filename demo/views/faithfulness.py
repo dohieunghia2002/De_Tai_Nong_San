@@ -22,10 +22,10 @@ st.markdown(
 summary = ui.read_json('weeds_xai/xai_summary.json')
 faith = summary['faithfulness']
 METHODS = {'integrated_gradients': ('Theo IG', '#2a78d6', 'lời giải thích'),
-           'predicted_weed': ('Theo xác suất cỏ của mô hình (mốc)', '#eb6834', 'lời giải thích'),
+           'predicted_weed': ('Theo xác suất cỏ (mốc)', '#eb6834', 'lời giải thích'),
            'grad_cam': ('Theo Grad-CAM', '#1baf7a', 'lời giải thích'),
            'random_cell': ('Ngẫu nhiên trong ô', '#898781', 'đối chứng ngẫu nhiên'),
-           'random_tile': ('Ngẫu nhiên trên cả ô ảnh', '#c3c2b7', 'đối chứng ngẫu nhiên')}
+           'random_tile': ('Ngẫu nhiên cả ô ảnh', '#c3c2b7', 'đối chứng ngẫu nhiên')}
 PATCHES_PER_TILE = (C.TILE // C.PATCH) ** 2
 PATCHES_PER_CELL = (C.PRIMARY['cell_size'] // C.PATCH) ** 2
 rows = []
@@ -41,7 +41,7 @@ n_cells = int(df['cells'].max())
 st.subheader('Phép xóa vùng')
 domain = [v[0] for v in METHODS.values()]
 colour = alt.Color('method:N', title=None, scale=alt.Scale(domain=domain, range=[v[1] for v in METHODS.values()]),
-                   legend=alt.Legend(orient='top', columns=3))
+                   legend=alt.Legend(orient='bottom', columns=2, labelLimit=0))  # whole names, not cut
 dash = alt.StrokeDash('kind:N', title=None, scale=alt.Scale(domain=['lời giải thích', 'đối chứng ngẫu nhiên'],
                                                             range=[[1, 0], [5, 3]]), legend=None)
 
@@ -102,14 +102,17 @@ share_ig = C.in_cell_share(maps['ig'], maps['cell'])
 share_gc = C.in_cell_share(maps['grad_cam'], maps['cell'])
 corr_ig = C.within_tile_correlation(maps['ig'], maps['tile'])
 corr_gc = C.within_tile_correlation(maps['grad_cam'], maps['tile'])
-c1, c2, c3, c4 = st.columns(4)
-c1.metric('IG: phần nằm trong ô (ô PHUN)', ui.pct(np.nanmedian(share_ig[dec == C.SPRAY]), 0), border=True)
-c2.metric('IG: phần nằm trong ô (ô CHƯA CHẮC)', ui.pct(np.nanmedian(share_ig[dec == C.DEFER]), 0), border=True)
-c3.metric('Grad-CAM: phần nằm trong ô', ui.pct(np.nanmedian(share_gc[dec != C.NO_SPRAY]), 0), border=True,
-          help='Một ô chiếm 1/9 ô ảnh (11%): bản đồ rải đều khắp ô ảnh cũng cho khoảng chừng ấy.')
-c4.metric('Tương quan bản đồ giữa các ô cùng ô ảnh', f'IG {ui.num(corr_ig.median(), 3)} · Grad-CAM '
-          f'{ui.num(corr_gc.median(), 3)}', border=True,
-          help='1 nghĩa là mọi ô của cùng ô ảnh có bản đồ giống hệt nhau.')
+# short labels in two rows: four long labels in one row were cut, and so was the Grad-CAM correlation itself
+st.markdown('**Phần đóng góp dương của bản đồ nằm trong chính ô được giải thích** (trung vị; một ô là 1/9 ô ảnh, nên '
+            'bản đồ rải đều khắp ô ảnh cho khoảng 11%)')
+c1, c2, c3 = st.columns(3)
+c1.metric('IG, ô PHUN', ui.pct(np.nanmedian(share_ig[dec == C.SPRAY]), 0), border=True)
+c2.metric('IG, ô CHƯA CHẮC', ui.pct(np.nanmedian(share_ig[dec == C.DEFER]), 0), border=True)
+c3.metric('Grad-CAM, ô PHUN và CHƯA CHẮC', ui.pct(np.nanmedian(share_gc[dec != C.NO_SPRAY]), 0), border=True)
+st.markdown('**Tương quan giữa bản đồ của các ô trong cùng một ô ảnh** (trung vị; 1 nghĩa là mọi ô có cùng một bản đồ)')
+c1, c2, _ = st.columns(3)
+c1.metric('IG', ui.num(corr_ig.median(), 3), border=True)
+c2.metric('Grad-CAM', ui.num(corr_gc.median(), 3), border=True)
 st.caption(f'Tính lại ngay từ `results/weeds_xai/xai_maps.npz` (trung vị; phần dương của bản đồ; tương quan trung bình '
            f'theo từng ô ảnh, {len(corr_gc)} ô ảnh). Grad-CAM gộp gradient thành một trọng số cho mỗi kênh trên cả bản '
            'đồ đặc trưng, nên nó chỉ ra mọi chỗ "giống cỏ" trên ô ảnh, không riêng ô đang quyết định. Đây là bản chất '
@@ -122,13 +125,7 @@ band = pd.DataFrame({'band': list(C.BANDS), 'median': [100 * shares[b].median() 
 band['text'] = [('+' if v >= 0 else '−') + ui.num(abs(v), 0) + '%' for v in band['median']]
 a, b = st.columns([3, 2])
 with a:
-    base = alt.Chart(band).encode(y=alt.Y('band:N', sort=list(C.BANDS), title=None),
-                                  x=alt.X('median:Q', title='tỉ lệ đóng góp, trung vị trên các ô (%)'))
-    st.altair_chart((base.mark_bar(color='#2a78d6', cornerRadiusEnd=4, size=22).encode(
-        tooltip=[alt.Tooltip('band:N', title='dải'), alt.Tooltip('median:Q', title='trung vị (%)', format='.1f'),
-                 alt.Tooltip('top:Q', title='số ô đứng đầu')])
-        + base.mark_text(align='left', dx=4, color='#0b0b0b').encode(text='text:N')).properties(height=230),
-        width='stretch')
+    ui.band_chart(band['median'], 'tỉ lệ đóng góp, trung vị trên các ô (%)', digits=0, suffix='%', height=230)
 with b:
     st.dataframe(pd.DataFrame({'Dải phổ': band['band'], 'Số ô dải này đóng góp nhiều nhất': band['top']}),
                  hide_index=True)

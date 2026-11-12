@@ -1,7 +1,6 @@
 """Segmentation: the authors' models reproduce the paper, per-class IoU, any test tile, and the project's own
 training runs."""
 import altair as alt
-import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -54,24 +53,30 @@ st.caption(f'IoU trên riêng ô ảnh này, tính lại từ bản đồ xác s
 
 st.subheader('Các lần đề tài tự huấn luyện (kiểm tra khả năng tái hiện)')
 runs = C.training_runs()
-schedule_vi = {'100 epochs fixed': '100 epoch cố định', '100 epochs, cosine lr': '100 epoch, lr giảm dần (cosine)',
-               'early stopping (30)': 'dừng sớm (30 epoch không cải thiện)'}
+schedule_vi = {'100 epochs fixed': '100 epoch', '100 epochs, cosine lr': '100 epoch, lr cosine',
+               'early stopping (30)': 'dừng sớm'}
 selection_vi = {'best val': 'val cao nhất', 'last epoch': 'epoch cuối'}
+run_cols = {'Lần chạy': runs['run'], 'Chọn mô hình theo': runs['selection'].map(selection_vi)}
+all_rows = 35 * (len(runs) + 1) + 3  # tall enough to show every run without scrolling
+# two tables instead of one with 14 columns, whose last columns (the decisions) were off the screen
+st.markdown('**Phân vùng** (IoU trên tập kiểm tra, %)')
 st.dataframe(pd.DataFrame({
-    'Lần chạy': runs['run'], 'Lịch huấn luyện': runs['schedule'].map(schedule_vi).fillna(runs['schedule']),
-    'Batch': runs['batch'].astype(int), 'Seed': runs['seed'].astype(int),
-    'Chọn mô hình theo': runs['selection'].map(selection_vi), 'Epoch': runs['epoch'].astype(int),
-    'mIoU val (%)': [ui.num(v, 2) for v in runs['val_miou']], 'mIoU test (%)': [ui.num(v, 2) for v in runs['test_miou']],
+    **run_cols, 'Lịch huấn luyện': runs['schedule'].map(schedule_vi).fillna(runs['schedule']),
+    'Batch': runs['batch'].astype(int), 'Seed': runs['seed'].astype(int), 'Epoch': runs['epoch'].astype(int),
+    'mIoU val': [ui.num(v, 2) for v in runs['val_miou']], 'mIoU test': [ui.num(v, 2) for v in runs['test_miou']],
     'IoU ngô': [ui.num(v, 2) for v in runs['test_crop']], 'IoU cỏ': [ui.num(v, 2) for v in runs['test_weed']],
-    'Giảm phun': [ui.pct(v) for v in runs['spray_reduction']], 'Chưa chắc': [ui.pct(v) for v in runs['deferred']],
-    'Bỏ sót': [ui.pct(v) for v in runs['missed_need_rate']], 'Phun nhầm': [ui.pct(v) for v in runs['false_spray_rate']],
-}), hide_index=True)
+}), hide_index=True, height=all_rows)
 own = runs[(runs['batch'] == 8) & (runs['selection'] == 'best val')]['test_miou']
 st.caption(f'{len(own)} lần batch 8, chọn theo val: mIoU test {ui.num(own.min(), 2)}–{ui.num(own.max(), 2)}%, trung '
            f'bình {ui.num(own.mean(), 2)}%; bài báo đạt {ui.num(p.set_index("model").loc["dlv3p_msi_3", "paper"], 2)}%. '
-           'Khác biệt giữa các lần chủ yếu là dao động ngẫu nhiên của quá trình huấn luyện. Bốn cột cuối là tầng quyết '
-           'định (thiết lập chính) chạy trên mô hình của từng lần. Nguồn: `results/weeds_runs/runs_summary.csv`, '
-           '`results/weeds_pilot*/`.')
+           'Khác biệt giữa các lần chủ yếu là dao động ngẫu nhiên của quá trình huấn luyện. "dừng sớm": dừng khi 30 epoch '
+           'liền val không cải thiện. Nguồn: `results/weeds_runs/runs_summary.csv`, `results/weeds_pilot*/`.')
+st.markdown('**Tầng quyết định chạy trên mô hình của từng lần** (thiết lập chính)')
+st.dataframe(pd.DataFrame({
+    **run_cols, 'Giảm diện tích phun': [ui.pct(v) for v in runs['spray_reduction']],
+    'Ô CHƯA CHẮC': [ui.pct(v) for v in runs['deferred']], 'Bỏ sót': [ui.pct(v) for v in runs['missed_need_rate']],
+    'Phun nhầm': [ui.pct(v) for v in runs['false_spray_rate']],
+}), hide_index=True, height=all_rows)
 
 names = {'weeds_pilot': 'lần 1 (batch 2)', 'weeds_pilot_b8': 'lần 2 (batch 8, dừng sớm, seed 0)'}
 options = [r for r in ['weeds_pilot', 'weeds_pilot_b8', *dict.fromkeys(runs['run'])] if C.training_history(r) is not None]
@@ -86,7 +91,7 @@ if chosen:
         x=alt.X('epoch:Q', title='epoch'),
         y=alt.Y('val_miou:Q', title='mIoU tập val (%)', scale=alt.Scale(zero=False)),
         color=alt.Color('run:N', title=None, scale=alt.Scale(domain=domain, range=palette),
-                        legend=alt.Legend(orient='top')))
+                        legend=alt.Legend(orient='top', labelLimit=0)))  # labelLimit=0: names are not cut
     hover = alt.selection_point(fields=['epoch'], nearest=True, on='pointerover', empty=False)
     chart = (base.mark_line(strokeWidth=2)
              + base.mark_point(size=70, filled=True).encode(
