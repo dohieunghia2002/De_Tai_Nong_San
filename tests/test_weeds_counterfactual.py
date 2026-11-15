@@ -29,6 +29,17 @@ def small_case():
     return p, t
 
 
+def test_ranked_patches_breaks_ties_with_the_second_map():
+    # a 4 x 4 cell of 2 x 2 patches: one weed pixel in patch 0 and one in patch 3; patch 3 has more P(weed)
+    w = np.zeros((4, 4))
+    w[0, 0] = w[2, 2] = 1
+    p = np.zeros((4, 4))
+    p[2, 3] = 0.4
+    order, masses = ranked_patches(w, 2, p)
+    assert order[:2].tolist() == [3, 0] and masses.tolist() == [1, 1, 0, 0]
+    assert ranked_patches(w, 2)[0][:2].tolist() == [0, 3]  # without a tie-break map: patch order
+
+
 def test_ranked_patches():
     order, masses = ranked_patches(small_case()[0][0, :4, :4], PATCH)
     assert list(order) == [0, 1, 2, 3]

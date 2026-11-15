@@ -1,10 +1,11 @@
 """Model check of the counterfactual explanations of src.weeds.counterfactual.
 
-src.weeds.counterfactual estimates from the P(weed) map alone, without running the model again, the fewest 20 x 20 px
-patches of a cell whose removal ends SPRAY (k_not_spray) and gives NO_SPRAY (k_no_spray). Here the model rescores the
-tile after the first k = 1, 2, ... ranked patches of the cell are replaced by bare soil (the values of
-src.weeds.explain), for every SPRAY and DEFER cell. Patches are ranked by the model's own P(weed) mass inside the cell,
-as the 'predicted_weed' ranking of the deletion test, i.e. in the order the explanation names them. The scan stops
+src.weeds.counterfactual estimates from the model's weed pixels alone, without running the model again, the fewest
+20 x 20 px patches of a cell whose removal ends SPRAY (k_not_spray) and gives NO_SPRAY (k_no_spray). Here the model
+rescores the tile, with the decision score (the share of weed pixels), after the first k = 1, 2, ... ranked patches of
+the cell are replaced by bare soil (the values of src.weeds.explain), for every SPRAY and DEFER cell. Patches are
+ranked by the model's own weed pixels inside the cell, ties by P(weed) mass, as the 'predicted_weed' ranking of the
+deletion test, i.e. in the order the explanation names them. The scan stops
 once the model gives NO_SPRAY and k has passed it and both estimates by `extra` patches, or when every patch of the
 cell is gone. The first k at which the model's decision changes checks the explanation as it is shown ("remove these
 k patches and the cell is no longer sprayed"). It is not the fewest patches for the model: with context, another set
@@ -33,25 +34,27 @@ from src.weeds.authors import load_checkpoint
 from src.weeds.counterfactual import GSD_CM, PATCH, first_index, ranked_patches, removal_path
 from src.weeds.data import BANDS, load_npz
 from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, decide_conformal
-from src.weeds.explain import autocast, cell_scores, check_grid, occlude, weed_prob
+from src.weeds.explain import autocast, cell_scores, check_grid, occlude, weed_pixels, weed_prob
 
-CHECK_VERSION = 1  # bump when the scan changes: parts of another version are not merged
+CHECK_VERSION = 2  # bump when the scan changes: parts of another version are not merged (2: the weed-pixel score)
 
 
 def weed_map(model, x, amp=True):
-    """The model's P(weed) map (H, W) of one tile x (bands, H, W), float32."""
+    """The model's weed pixels (H, W) bool and P(weed) map (H, W) float32 of one tile x (bands, H, W)."""
     with torch.no_grad(), autocast(x, amp):
-        return weed_prob(model(x[None]))[0]
+        logits = model(x[None])
+    return weed_pixels(logits)[0], weed_prob(logits)[0]
 
 
-def cell_ranking(pred, rc, cell, patch):
-    """For cell rc = (row, col) of a P(weed) map: its patches ranked by P(weed) mass, largest first, as row-major
-    indices in the tile's patch grid; the cell's score s; and the estimated scores after removing 0, 1, ... of them."""
+def cell_ranking(weed, pred, rc, cell, patch):
+    """For cell rc = (row, col) of a tile's weed pixels and P(weed) map: its patches ranked by weed pixels, largest
+    first, ties by P(weed) mass, as row-major indices in the tile's patch grid; the cell's score s (its share of weed
+    pixels); and the estimated scores after removing 0, 1, ... of them."""
     r, c = rc
-    order, masses = ranked_patches(pred[r * cell:(r + 1) * cell, c * cell:(c + 1) * cell].double().cpu().numpy(),
-                                   patch)
-    side, grid_cols = cell // patch, pred.shape[1] // patch
-    s = float(pred[r * cell:(r + 1) * cell, c * cell:(c + 1) * cell].double().mean())
+    sl = (slice(r * cell, (r + 1) * cell), slice(c * cell, (c + 1) * cell))
+    order, masses = ranked_patches(weed[sl].double().cpu().numpy(), patch, pred[sl].double().cpu().numpy())
+    side, grid_cols = cell // patch, weed.shape[1] // patch
+    s = masses.sum() / cell ** 2
     return (r * side + order // side) * grid_cols + c * side + order % side, s, removal_path(s, masses, cell)
 
 
@@ -71,13 +74,13 @@ def verify_tile(model, x, base, cells, cell, patch=PATCH, batch=8, extra=2, amp=
     tile (bands, H, W) in [0, 1] on the model's device; base: bare-soil value per band. Returns one row per scored
     (cell, k), one row per cell, and the number of forward passes."""
     check_grid(x.shape[1], x.shape[2], cell, patch)
-    pred = weed_map(model, x, amp)
+    weed, pred = weed_map(model, x, amp)
     n_cols, grid = x.shape[2] // cell, (x.shape[1] // patch, x.shape[2] // patch)
     passes, step_rows, cell_rows = 1, [], []
     for _, c in cells.iterrows():
         lo, hi = float(c['lam_lo']), float(c['lam_hi'])
         rc = divmod(int(c['cell']), n_cols)
-        patches, s0, est = cell_ranking(pred, rc, cell, patch)
+        patches, s0, est = cell_ranking(weed, pred, rc, cell, patch)
         k_est = estimated_k(est, lo, hi)
         scores = [s0]
         no_at = 0 if decide_conformal(np.array([s0]), lo, hi)[0] == NO_SPRAY else None
@@ -124,10 +127,10 @@ def planned_passes(model, tiles, cells, cell, patch, batch, extra, amp=True):
     tiles: {tile id: tile tensor on the model's device}; cells: decision-table rows of those tiles."""
     total = 0
     for tile, x in tiles.items():
-        pred = weed_map(model, x, amp)
+        weed, pred = weed_map(model, x, amp)
         total += 1
         for _, c in cells[cells['tile'] == tile].iterrows():
-            patches, _, est = cell_ranking(pred, divmod(int(c['cell']), x.shape[2] // cell), cell, patch)
+            patches, _, est = cell_ranking(weed, pred, divmod(int(c['cell']), x.shape[2] // cell), cell, patch)
             k_est = estimated_k(est, float(c['lam_lo']), float(c['lam_hi']))
             finite = [int(k) for k in k_est if np.isfinite(k)]
             target = min(len(patches), max(finite) + extra if finite else len(patches))

@@ -15,3 +15,9 @@ address = "localhost"
 [theme]
 # the figures are drawn on white
 base = "light"
+
+[theme.sidebar]
+# Streamlit 1.65 leaves these empty when only `base` is set and the browser console then warns "Invalid color
+# passed for primaryColor in theme.sidebar" on every rerun: the values of the light theme, written out
+primaryColor = "#ff4b4b"
+textColor = "#31333f"

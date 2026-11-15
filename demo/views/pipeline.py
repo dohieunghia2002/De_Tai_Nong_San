@@ -15,12 +15,12 @@ CF = C.CF
 CELL, TAU = PL.CELL, PL.TAU
 CELL_CM2 = C.cell_cm2(CELL)
 SPLIT_VI = {'train': 'tập huấn luyện', 'val': 'tập chọn mô hình (val)', 'test': 'tập kiểm tra'}
-# Integrated gradients on CPU, measured on the user's laptop (i7-1165G7, 4 threads, 12/11/2026): a forward pass of a
-# 600 x 600 tile took 2.7 s; two IG steps on a 300 x 300 crop took 4.1 s including the closing forward pass of two
-# images, i.e. a step (forward + backward) about twice a forward pass of the same size, and the process grew by about
-# 0.4 GB. A tile has four times the pixels: about 1.5 GB more memory. Both constants round these up.
+# Integrated gradients on CPU, measured on the user's laptop (i7-1165G7, 4 threads, 13/11/2026) on a 600 x 600 tile
+# with PL.attributions: a forward pass took 3.2 s; 2 IG steps plus Grad-CAM took 22.8 s, i.e. a step (forward +
+# backward) about 6.5 s, twice a forward pass, so 32 steps take about 3.5-5 minutes; the process peaked 1.94 GB above
+# the loaded model. Both constants round these up.
 IG_STEP_FACTOR = 3     # seconds of one IG step / seconds of one forward pass
-IG_RAM_GB = 2          # free memory to have before computing IG on a tile
+IG_RAM_GB = 2.5        # free memory to have before computing IG on a tile
 
 ui.need_data()
 st.title('Chạy thử Hệ thống hỗ trợ ra quyết định phun thuốc trừ cỏ')
@@ -97,7 +97,7 @@ if source == 'dataset':
     tiles = ids[split]
     tile_id = b.selectbox('Ô ảnh', tiles, index=tiles.index(first) if first in tiles else 0,
                           format_func=lambda t: f'{t} · bay ngày {C.date_vi(t)}')
-    c.download_button('Tải 5 file của ô này để thử upload', sample_files(tile_id), f'{tile_id}_5_dai.zip',
+    c.download_button('Tải 5 file mẫu (zip)', sample_files(tile_id), f'{tile_id}_5_dai.zip',
                       'application/zip', icon=':material/download:', width='stretch')
     x, mask = ui.tile(tile_id)
     if split == 'train':
@@ -108,7 +108,7 @@ else:
                              'WeedsGalore), hoặc một file zip chứa 5 file đó', type=['png', 'zip'],
                              accept_multiple_files=True)
     if not files:
-        st.info('Chưa có file. Muốn thử nhanh: chọn "Chọn ô ảnh có sẵn", bấm "Tải 5 file của ô này", rồi upload file zip '
+        st.info('Chưa có file. Muốn thử nhanh: chọn "Chọn ô ảnh có sẵn", bấm "Tải 5 file mẫu (zip)", rồi upload file zip '
                 'vừa tải (hoặc 5 file bên trong). Ảnh lớn hơn 600 × 600 điểm ảnh sẽ được cắt lấy góc trên bên trái.',
                 icon=':material/upload:')
         ui.footer()
@@ -190,35 +190,39 @@ if split == 'test':
 st.header('② Quyết định cho từng ô 50 cm × 50 cm')
 _, fold_of = ui.locations()
 thr = PL.thresholds(tile_id, split, ui.cells(C.MAIN_MODEL, 'test', CELL), fold_of)
-cells = PL.decide_tile(p_weed, mask, tile_id, thr)
+cells = PL.decide_tile(probs[1], p_weed, mask, tile_id, thr)
 no_thr, sp_thr = min(thr['lam_lo'], thr['lam_hi']), max(thr['lam_lo'], thr['lam_hi'])
 where = ('các ô ảnh kiểm tra ở **phần vị trí còn lại** của ruộng (đúng như cách tính trong báo cáo)'
          if thr['how'] == 'crossfit' else 'toàn bộ ô của tập kiểm tra, 3 đợt bay trước ngày phun thuốc')
 st.markdown(
     f'Lượng cỏ dự đoán của mỗi ô = trung bình xác suất cỏ trong ô. **Ngưỡng phun {ui.num(sp_thr * CELL_CM2, 1)} cm²**, '
-    f'**ngưỡng không phun {ui.num(no_thr * CELL_CM2, 1)} cm²** (trên ô 2 500 cm²), tính bằng conformal trên {where}: '
-    f'{thr["n_need"]} ô cần phun và {thr["n_no_need"]} ô không cần phun, để bỏ sót và phun nhầm không quá '
-    f'{ui.pct(C.ALPHA, 0)}. Ô "cần phun" là ô có cỏ từ {ui.pct(TAU, 0)} diện tích trở lên (ngưỡng minh họa).')
-if split is not None and C.tile_date(tile_id) not in C.SCOPES[C.PRIMARY['scope']]:
+    f'**ngưỡng không phun {ui.num(no_thr * CELL_CM2, 1)} cm²** (trên ô {ui.num(CELL_CM2)} cm²), tính bằng conformal trên '
+    f'{where}: {thr["n_need"]} ô cần phun và {thr["n_no_need"]} ô không cần phun, để bỏ sót không quá '
+    f'{ui.pct(C.ALPHA, 0)} và phun nhầm không quá {ui.pct(C.BETA, 0)}. Ô "cần phun" là ô có cỏ từ {ui.pct(TAU, 0)} '
+    'diện tích trở lên (ngưỡng minh họa).')
+if split is None:
+    # an upload that is not a dataset tile: the conformal guarantee needs cells like the calibration cells
+    st.caption(':material/warning: Ảnh này không thuộc WeedsGalore: hai mức trên chỉ được bảo đảm cho ảnh cùng kiểu với '
+               'các ô dùng để hiệu chỉnh (cùng máy ảnh, độ cao bay, ruộng), nên không áp dụng cho ảnh này; trang cũng '
+               'không có nhãn để kiểm tra lại.')
+elif C.tile_date(tile_id) not in C.SCOPES[C.PRIMARY['scope']]:
     st.caption(':material/info: Đợt bay này diễn ra sau ngày phun thuốc (12/6), ngoài phạm vi đánh giá trong báo cáo (3 '
                'đợt bay trước ngày phun). Quyết định vẫn tính được, nhưng tỉ lệ bỏ sót và phun nhầm chưa được kiểm tra '
                'cho đợt bay này.')
-left, right = st.columns([3, 2])
-with left:
-    ui.figure('tile_decisions', rgb, cells, 'decision', CELL, TAU, f'{tile_id}: quyết định của hệ thống')
-with right:
-    counts = cells['decision'].value_counts()
-    k1, k2, k3 = st.columns(3)
-    for col, d in zip((k1, k2, k3), (C.SPRAY, C.DEFER, C.NO_SPRAY)):
-        col.metric(C.DECISION_VI[d], f'{int(counts.get(d, 0))} ô', border=True)
-    st.caption('Ô đánh số từ trái sang phải, trên xuống dưới. Ô CHƯA CHẮC: người ra xem, cần thì phun.')
-    if thr['how'] == 'crossfit':
-        saved = pd.read_csv(C.RESULTS / 'weeds_xai/decisions.csv')
-        saved = saved[saved['tile'] == tile_id].set_index('cell')['decision']
-        same = int((cells.set_index('cell')['decision'] == saved).sum())
-        st.caption(f':material/check_circle: Trùng quyết định đã báo cáo ở {same}/{len(saved)} ô '
-                   '(`results/weeds_xai/decisions.csv`).')
-# the table below the figure, over the full width: in the side column its last columns were cut off
+# one column: the counts as a line of badges (metric boxes in a side column cut their labels on a 1280 px screen),
+# the figure at its own size (in a side column it was shrunk), the table over the full width
+counts = cells['decision'].value_counts()
+st.markdown('**Trên ô ảnh này:** &nbsp; ' + ' &nbsp; '.join(f'{ui.decision_badge(d)} {int(counts.get(d, 0))} ô'
+                                                           for d in (C.SPRAY, C.DEFER, C.NO_SPRAY)),
+            unsafe_allow_html=True)
+ui.figure('tile_decisions', rgb, cells, 'decision', CELL, TAU, f'{tile_id}: quyết định của hệ thống', width='content')
+st.caption('Ô đánh số từ trái sang phải, trên xuống dưới. Ô CHƯA CHẮC: người ra xem, cần thì phun.')
+if thr['how'] == 'crossfit':
+    saved = pd.read_csv(C.RESULTS / 'weeds_xai/decisions.csv')
+    saved = saved[saved['tile'] == tile_id].set_index('cell')['decision']
+    same = int((cells.set_index('cell')['decision'] == saved).sum())
+    st.caption(f':material/check_circle: Trùng quyết định đã báo cáo ở {same}/{len(saved)} ô '
+               '(`results/weeds_xai/decisions.csv`).')
 view = {'Ô': cells['cell'] + 1, 'Quyết định': [C.DECISION_VI[int(d)] for d in cells['decision']],
         'Cỏ dự đoán': [f'{ui.num(s * CELL_CM2, 1)} cm² ({ui.pct(s, 2)})' for s in cells['s']]}
 if mask is not None:
@@ -233,7 +237,7 @@ st.dataframe(pd.DataFrame(view), hide_index=True)
 # ---------------------------------------------------------------- 3. explanations
 
 st.header('③ Giải thích quyết định của một ô')
-est = PL.explain_estimate(p_weed, cells).set_index('cell')
+est = PL.explain_estimate(probs[1], p_weed, cells).set_index('cell')
 
 
 def removal(k, outcome, what='vùng', removed_cm2=None):
@@ -366,7 +370,8 @@ if decision != C.NO_SPRAY:
                   icon=':material/play_arrow:', key='btn_' + check_key,
                   on_click=lambda: st.session_state.update({check_key: True}))
         # a few steps past NO_SPRAY, so the curve ends well below the zone label at the right edge
-        steps_est = PL.estimate_steps(p_weed, k, row['lam_lo'], row['lam_hi']).iloc[:max(k_no + 8, 2 * k_no + 2)]
+        steps_est = PL.estimate_steps(probs[1], p_weed, k, row['lam_lo'], row['lam_hi']).iloc[:max(k_no + 8,
+                                                                                                    2 * k_no + 2)]
         c_est = {'decision_rescored': decision, 'k_not_spray_model': k_not, 'k_no_spray_model': k_no,
                  'lam_lo': row['lam_lo'], 'lam_hi': row['lam_hi']}
         ui.figure('removal_curve', pd.Series(c_est), steps_est, estimate_only=True, width='content')
@@ -402,8 +407,8 @@ else:
     ig_minutes = PL.IG_STEPS * IG_STEP_FACTOR * seconds / 60
     if st.button(f'Tính IG và Grad-CAM cho ô {k + 1} trên máy này (khoảng {ui.num(max(ig_minutes, 1), 0)} phút, cần '
                  f'khoảng {ui.num(IG_RAM_GB, 1)} GB RAM trống)', icon=':material/play_arrow:', key='btn_' + key_ig,
-                 help='IG chạy xuôi và ngược mô hình 32 lần trên ảnh 600 × 600. Máy thiếu RAM sẽ chạy rất chậm: nên '
-                      'đóng bớt ứng dụng khác trước khi bấm.'):
+                 help=f'IG chạy xuôi và ngược mô hình {PL.IG_STEPS} lần trên ảnh {C.TILE} × {C.TILE}. Máy thiếu RAM sẽ '
+                      'chạy rất chậm: nên đóng bớt ứng dụng khác trước khi bấm.'):
         st.session_state[key_ig] = True
     if st.session_state.get(key_ig):
         with st.spinner(f'Đang tính IG ({PL.IG_STEPS} bước, mỗi bước chạy xuôi và ngược mô hình)…'):

@@ -22,7 +22,7 @@ st.set_page_config(page_title='Demo tiến độ: hỗ trợ ra quyết định 
 
 pages = {
     'Chạy thử hệ thống': [
-        st.Page('views/pipeline.py', title='Ảnh → tìm cỏ → quyết định → giải thích', icon=':material/play_circle:',
+        st.Page('views/pipeline.py', title='Từ ảnh đến quyết định', icon=':material/play_circle:',
                 default=True),
     ],
     'Kết quả đánh giá trên tập kiểm tra': [

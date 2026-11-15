@@ -24,9 +24,9 @@ def tables(key, cell):
     ids = C.dataset_ids()
     out = {}
     for split in ('val', 'test'):
-        tiles, _, p_weed = C.load_probs(key, split)
+        tiles, p_crop, p_weed = C.load_probs(key, split)
         C.check_order(tiles, ids[split])
-        out[split] = C.cell_table(tiles, C.to_3class(C.read_masks(tiles)), p_weed, cell)
+        out[split] = C.cell_table(tiles, C.to_3class(C.read_masks(tiles)), p_crop, p_weed, cell)
     return out, C.locations(ids['test'])[1]
 
 
@@ -66,6 +66,20 @@ def test_primary_decisions_equal_the_explained_ones():
     assert len(merged) == len(cells) == len(saved)
     assert (merged['conformal_3way'] == merged['decision']).all()
     assert np.allclose(merged['lam_lo'], merged['lam_lo_saved']) and np.allclose(merged['lam_hi'], merged['lam_hi_saved'])
+
+
+@needs_results
+def test_go_no_go_is_what_the_xai_notebook_checks_against():
+    """colab_weeds_xai.ipynb embeds the main model's go_no_go.json and checks its own decisions against it
+    (src.weeds.explain.decision_check): from the saved maps, the primary decisions must give it back exactly. On
+    14/11/2026 the thresholds in that file were text, and the notebook stopped with a numpy error."""
+    from src.weeds.analyze import primary_decisions
+    from src.weeds.explain import decision_check
+    t, fold_of = tables(C.MAIN_MODEL, C.PRIMARY['cell_size'])
+    rep = C.read_json(C.model_dir(C.MAIN_MODEL) / 'go_no_go.json')
+    assert rep['info']['primary_setting'] == C.PRIMARY
+    assert all(isinstance(v, float) for k in ('lam_lo', 'lam_hi') for v in rep['info'][k])
+    assert decision_check(primary_decisions(t['test'], fold_of), rep)['max_abs_diff'] < 1e-12
 
 
 @needs_results

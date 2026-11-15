@@ -34,7 +34,8 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric('Giảm diện tích phun', ui.pct(cf['spray_reduction']), border=True,
           help=f'So với phun cả ruộng. Ô CHƯA CHẮC được tính là đã có người ra xem, cần thì phun. Mức tốt nhất có '
                f'thể (biết trước đáp án) là {ui.pct(oracle["spray_reduction"])}.')
-c2.metric('Ô CHƯA CHẮC (người ra xem)', f'{ui.pct(cf["deferred"])} · {int(cf["n_deferred"])} ô', border=True)
+c2.metric('Ô CHƯA CHẮC', f'{ui.pct(cf["deferred"])} · {int(cf["n_deferred"])} ô', border=True,
+          help='Người ra xem, cần thì phun.')
 c3.metric('Bỏ sót', f'{ui.pct(cf["missed_need_rate"])} · {int(cf["n_missed"])} ô', border=True,
           help=f'Trong {n_need} ô cần phun, số ô bị quyết định KHÔNG PHUN.')
 c4.metric('Phun nhầm', f'{ui.pct(cf["false_spray_rate"])} · {int(cf["n_false_spray"])} ô', border=True,

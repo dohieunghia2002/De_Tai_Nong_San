@@ -1,4 +1,4 @@
-# Bàn giao giữa các phiên làm việc với Claude (cập nhật 10/11/2026)
+# Bàn giao giữa các phiên làm việc với Claude (cập nhật 14/11/2026)
 
 Đọc file này cùng `CLAUDE.md` trước khi làm tiếp. Mọi số liệu dưới đây lấy từ file kết quả thật, có ghi nguồn.
 
@@ -27,6 +27,11 @@
      - output 2: kết quả phân lớp (classification) cho từng ô 0,5 m: phun / không phun / chưa chắc.
      Người dùng đã gửi thầy sơ đồ xử lý vẽ trên một ô ảnh test thật (`scripts/make_pipeline_figure.py`, ảnh lưu tại `data/weedsgalore/so_do_pipeline.png`) và bài báo gốc.
    - **Yêu cầu của thầy (05/11):** "chạy thử rồi đối sánh với bài báo có dataset đó, xem thế nào; nếu ổn thì viết rồi hẹn vô gặp mình họp chốt".
+   - **Ngày 13/11** người dùng gửi thầy kết quả đối sánh, báo cáo PDF và video demo. Thầy trả lời: "triển khai lên Overleaf bài báo luôn", "làm tiếp cho phần này".
+   - **Chỉ đạo của thầy (14/11, qua Zalo):**
+     - viết **bài báo** khoảng 12–15 trang trên Overleaf để thầy nộp, vì thời gian phản biện rất lâu;
+     - trong bài phải có thực nghiệm và **đối sánh kết quả với các nghiên cứu khác**;
+     - đề án (luận văn) làm sau: người dùng chưa đăng ký đề cương. Thứ tự là bài báo → nộp → viết đề cương → phát triển dần thành đề án.
 
 ## 2. Dữ liệu WeedsGalore (đã kiểm tra trực tiếp)
 
@@ -64,7 +69,193 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
   - bảo đảm conformal theo từng lớp;
   - hiệu chỉnh lại khi sang đợt bay mới;
   - XAI có kiểm chứng độ trung thực, bằng phép che vùng có đối chứng ngẫu nhiên.
-- **Ngưỡng phun có nguồn, nhưng chưa đọc toàn văn để lấy số:** Gutjahr 2012 và Ali 2015 (*Weed Research*), MoDiCoVi (*Sensors* 2016), Longchamps (*Weed Science*). **Ngưỡng τ hiện tại (1%) chỉ là minh họa.**
+- **Ngưỡng phun:** đã tra cứu ngày 14/11, xem mục 3.2. **Ngưỡng τ hiện tại (1%) vẫn chỉ là minh họa.**
+
+### 3.1. Tra cứu tính mới của giải thích phản thực (14/11/2026)
+
+Cách tra: công cụ tìm kiếm web, chủ yếu đọc tóm tắt. **Chưa tra Google Scholar / Scopus**, nên khi viết bài dùng "theo hiểu biết của chúng tôi".
+
+**Đã có người làm, phải trích dẫn, không được nhận là mới:**
+- **Xóa tập vùng ảnh nhỏ nhất đến khi kết quả đổi.** Câu "bỏ k vùng 5 cm thì ô hết PHUN" của đề tài thuộc họ này:
+  - SEDC: Vermeire và cộng sự, *Pattern Analysis and Applications* 2022, doi:10.1007/s10044-021-01055-y, arXiv:2004.07511. Xóa tập phân đoạn ảnh nhỏ nhất làm đổi lớp dự đoán;
+  - Fong & Vedaldi, ICCV 2017 ("meaningful perturbation");
+  - Dabkowski & Gal, NeurIPS 2017.
+- **Phản thực cho tập dự đoán conformal:** Maalej, Sönströd & Johansson, COPA 2025, PMLR 266:405–424. Dữ liệu bảng, phân loại; tóm tắt không nói đến trạng thái từ chối / chưa quyết.
+- **Phản thực cho quyết định từ chối (reject option):** Artelt, Brinkrolf, Visser & Hammer, IJCCI 2022 (bộ phân loại LVQ); Artelt, Visser & Hammer, ESANN 2022 (không phụ thuộc mô hình).
+- **Phản thực cho mô hình phân vùng ảnh:** OCTET, Zemni và cộng sự, CVPR 2023 (ảnh xe tự lái).
+- **Phản thực trong nông nghiệp:** Morales & Sheppard, IJCNN 2023 (đường cong đáp ứng phân bón, dữ liệu bảng).
+
+**Chưa tìm thấy, có thể nêu là đóng góp:**
+- phản thực cho **quyết định phun cỏ** từ ảnh UAV (các bài XAI về tìm cỏ hầu như chỉ dùng Grad-CAM);
+- tổ hợp: quyết định 3 mức có bảo đảm conformal + phản thực ở mức quyết định với phép xóa có nghĩa ngoài ruộng (thay cỏ bằng đất) + ước lượng nhanh từ bản đồ xác suất, có mô hình kiểm chứng + chỉ chỗ cần ra xem cho ô CHƯA CHẮC.
+
+**Cách viết đề nghị:** "áp dụng giải thích phản thực dạng xóa vùng (như SEDC) cho quyết định phun 3 mức có bảo đảm conformal…", không viết "đề xuất phương pháp phản thực mới".
+
+### 3.2. Tra cứu ngưỡng phun và kích thước ô (14/11/2026)
+
+| Bài | Đã đọc | Cây | Ngưỡng phun | Ô / vùng phun |
+|---|---|---|---|---|
+| Allmendinger, Spaeth, Saile, Peteinatos & Gerhards, *Plants* 13(15):2164, 2024, doi:10.3390/plants13152164 | toàn văn (PMC11314123) | ngô | **0** (thấy cỏ là phun): "Due to the low competitive ability of maize to suppress weeds [2], a zero weed threshold was used" | béc cách 0,5 m, vùng phun nhỏ nhất 1 m × 1 m (0,5 m trước và sau mỗi cây cỏ). Ảnh 1,4 mm/điểm ảnh. Phun sớm tiết kiệm 47% thuốc, năng suất không giảm có ý nghĩa |
+| Sapkota, Stenger, Ostlie & Flores, *Sci Rep* 13:6548, 2023 | bản arXiv v1 (2301.07519) | ngô | ô có ít nhất 1 cây cỏ thì phun | ô 1,67 × 10 ft, vệt phun mỗi béc 0,5 m; tiết kiệm 26% diện tích |
+| Longchamps, Panneton, Simard & Leroux, *Weed Science* 62(1):177–185, 2014 | tóm tắt | (tóm tắt không ghi) | ngưỡng kinh tế **0,06–0,31% diện tích cỏ**, do chuyên gia tư vấn đánh giá hơn 2.500 ảnh | ảnh 2 m × 3 m |
+| San Martín, Andújar, Barroso, Fernández-Quintanilla & Dorado, *Weed Technology* 30:888–897, 2016, doi:10.1614/WT-D-16-00039.1 | toàn văn | ngô (Tây Ban Nha) | 6 và 12 cây/m² (theo các ngưỡng đã công bố) | ô 0,75 × 0,5 m; mô phỏng máy phun béc cách 0,5 m |
+| Peña và cộng sự, *PLoS ONE* 8(10):e77151, 2013 | toàn văn | ngô (UAV, 2 cm/điểm ảnh) | **không chốt ngưỡng**; chia mức cỏ: không cỏ, <5%, 5–20%, >20% | 1 m × khoảng cách hàng (0,7 m); "lưới và ngưỡng tùy theo máy phun" |
+| López-Granados và cộng sự, *Precision Agriculture* 2016, doi:10.1007/s11119-015-9415-8 | đoạn trích tìm kiếm | hướng dương | thử 7 ngưỡng 0–15%, bước 2,5% | – |
+| Nikolić, Pappalardo, De Marchi & Masin 2025, "From detection to action…" | đoạn trích tìm kiếm (toàn văn bị chặn) | ngô (đông bắc Ý) | thử >1%, >5%, >10% điểm ảnh là cỏ | 0,25 m², 2 m², 3 m². **Chưa xác nhận tạp chí** |
+| Ali, Streibig, Christensen & Andreasen, *Weed Research* 55:26–33, 2015, "Image-based thresholds for weeds in maize fields" | chưa đọc | ngô | – | – |
+
+**Ý chính rút ra từ San Martín 2016 (toàn văn):**
+- ngưỡng kinh tế nói chung rất thấp (trích Longchamps 2014);
+- với loài cỏ sinh sản mạnh hoặc kháng thuốc nên dùng ngưỡng 0 (trích Norsworthy 2014);
+- tăng ngưỡng thì tiết kiệm thuốc hơn nhưng bỏ sót nhiều hơn.
+
+**Kết luận:**
+- Với ngô, tài liệu nghiêng về ngưỡng rất thấp: 0, hoặc 0,06–0,31% diện tích cỏ. τ = 1% là mức lỏng; nguồn ủng hộ duy nhất (Nikolić 2025) chưa xác nhận được.
+- `results/weeds_authors/dlv3p_msi_3/decision_metrics.csv` đã có τ = 0,1%, 0,5%, 1%, 2% (ô 100 và 200 điểm ảnh). τ = 0,1% nằm trong khoảng của Longchamps. **τ = 0 chưa tính.**
+- Ngưỡng của Longchamps đo trên ảnh 2 m × 3 m; trên ô 0,25 m², 0,1% chỉ là khoảng 2,5 cm² cỏ, nên không chuyển thẳng ngưỡng giữa hai kích thước ô được.
+- Ô 0,5 m khớp khoảng cách béc phun 0,5 m (Allmendinger 2024, Sapkota 2023, San Martín 2016). Theo chiều xe chạy, máy thật cần khoảng 1 m vì độ trễ đóng mở béc (Allmendinger 2024).
+- **Đã quyết (người dùng, 14/11):** τ chính = 0,1%, báo cáo thêm độ nhạy theo 7 mức τ (mục 3.3).
+
+### 3.3. Đổi τ chính sang 0,1% và phân tích độ nhạy (14/11/2026)
+
+**Code:**
+- `decision.needs_spray`: τ = 0 (`ANY_WEED`) nghĩa là "có cỏ là phun", tức `w > 0`; định nghĩa cũ `w >= 0` sẽ coi cả ô không có cỏ là cần phun.
+- `analyze.TAUS` = (0; 0,06%; 0,1%; 0,31%; 0,5%; 1%; 2%), có ghi nguồn trong comment. `PRIMARY['tau']` = 0,001.
+- `analyze.main` ghi file bằng LF trên mọi hệ điều hành.
+
+**Kết quả đã tính lại trên máy** (chỉ numpy và pandas, từ bản đồ xác suất đã lưu):
+- `decision_metrics.csv` và `go_no_go.json` của 4 thư mục có `probs_*.npz` (2 mô hình tác giả, 2 lần chạy thử). Các dòng của 4 mức τ cũ trùng file cũ (sai khác ≤ 4,4·10⁻¹⁶).
+- **Sự cố ngày 14/11 (đã sửa):** `go_no_go.json` tính lại từ `decision_metrics.csv` đọc bằng pandas ghi `lam_lo`/`lam_hi` thành chữ, ví dụ `"(0.0023, 0.0015)"`, vì CSV lưu tuple thành chữ. Notebook XAI vì vậy dừng ở `decision_check` với lỗi numpy `ufunc 'subtract' … <U44`.
+  - Cách sửa: `analyze.per_fold` đổi chữ về danh sách số (kể cả `inf`); 4 thư mục có `probs_*.npz` được ghi lại bằng lệnh `analyze`.
+  - Hai test mới bắt lỗi này: `test_go_no_go_reads_the_thresholds_back_from_csv`, và `test_go_no_go_is_what_the_xai_notebook_checks_against` (chạy đúng phép đối chiếu của notebook trên file thật).
+- 12 lần tự huấn luyện không có `probs_*.npz` trên máy, nên không có các mức τ mới. `go_no_go.json` và `runs_summary.csv` được tính lại ở τ = 0,1% từ `decision_metrics.csv` có sẵn; các cột khác của `runs_summary.csv` giữ nguyên. (Từ 15/11 đã thay bằng kết quả tính lại trên Drive với điểm s mới, đủ 7 mức τ: mục 3.7.)
+- **Tiêu chí C2 đổi (người dùng yêu cầu, 14/11):** từ "giảm ≥ 30%" (đặt cho τ = 1%) sang "giảm ít nhất 60% mức giảm tối đa có thể (oracle)". Hệ số 0,6 = 30% / 50%, tức mức tối đa ở τ = 1%, nên ở τ = 1% hai tiêu chí giống hệt nhau. Ở τ = 0,1%, mức tối đa là 10,2% nên yêu cầu là ≥ 6,11%.
+  - Lý do: ở τ = 0,1% không mô hình nào đạt được mức cũ, kể cả khi biết trước đáp án.
+  - Kết luận GO/NO-GO của cả 16 thư mục không đổi so với τ = 1% với tiêu chí cũ: 14 GO; 2 NO-GO vì C1 (lần chạy thử 1, và es_seed1 ở epoch cuối).
+  - Trang Tổng quan của demo vẫn gọi đây là "tiêu chí đề ra trước khi chạy thử": cần ghi chú việc đổi C2 khi cập nhật demo.
+
+**Bảng độ nhạy, mô hình chính** (5 dải; 216 ô, ô 50 cm, gộp 3 đợt bay, hiệu chỉnh chéo). DT = đề tài (conformal 3 mức), NCĐ = ngưỡng cố định; số trong ngoặc là số ô:
+
+| τ | Cần / không cần phun | Giảm tối đa | DT: giảm / CHƯA CHẮC / bỏ sót / phun nhầm | NCĐ: bỏ sót / phun nhầm |
+|---|---|---|---|---|
+| có cỏ là phun | 209 / 7 | 3,2% | 13,9% / 186 / **11,0% (23)** / 0% (0) | 0% / 100% (7) |
+| 0,06% | 201 / 15 | 6,9% | 15,7% / 86 / 9,5% (19) / 0% (0) | 0,5% / 26,7% (4) |
+| **0,1%** | 194 / 22 | 10,2% | 15,7% / 2 / 6,7% (13) / 4,5% (1) | 2,1% / 13,6% (3) |
+| 0,31% | 164 / 52 | 24,1% | 29,2% / 21 / 8,5% (14) / 5,8% (3) | 4,3% / 17,3% (9) |
+| 0,5% | 144 / 72 | 33,3% | 37,5% / 11 / 9,0% (13) / 5,6% (4) | 3,5% / 9,7% (7) |
+| 1% | 108 / 108 | 50,0% | 49,5% / 9 / 3,7% (4) / 4,6% (5) | 3,7% / 7,4% (8) |
+| 2% | 75 / 141 | 65,3% | 65,7% / 21 / 1,3% (1) / 0% (0) | 1,3% / 7,8% (11) |
+
+- **Mô hình RGB:** đề tài giữ cả hai tỉ lệ ≤ 10% ở mọi mức τ; ở 0,1% và 0,06% phải đẩy 47 và 123 ô sang CHƯA CHẮC. Ngưỡng cố định vượt giới hạn ở 5/7 mức: phun nhầm 100% ở 2 mức thấp nhất, 50% ở 0,1%; bỏ sót 21,3%, 20,8%, 16,7% ở 0,31%, 0,5%, 1%.
+- **Mọi mô hình có kết quả** (4 mô hình ở mức mới, 16 ở mức cũ), số mô hình có bỏ sót hoặc phun nhầm vượt 10%:
+  - đề tài: 2/4, 1/4, 3/16, 1/4, 3/16, 1/16, 0/16 (theo thứ tự τ ở bảng trên); mức vượt lớn nhất 13,9%;
+  - ngưỡng cố định: 4/4, 4/4, 16/16, 4/4, 7/16, 5/16, 2/16; mức vượt lớn nhất 100%.
+- **Lưu ý khi viết:**
+  - Ở τ thấp, "giảm" của đề tài lớn hơn mức tối đa là do bỏ sót, không phải tiết kiệm thật.
+  - Ở τ = 0,1% chỉ có 22 ô không cần phun, nên 1 ô = 4,5 điểm phần trăm; các trường hợp vượt (13,6% = 3/22 ô) chỉ cách giới hạn 1 ô.
+  - "Có cỏ là phun" và 0,06% gần như không còn bài toán ở ruộng này: hầu hết ô cần phun, và bảo đảm phải đổi bằng rất nhiều ô CHƯA CHẮC.
+- **Ước lượng phản thực nhanh ở τ = 0,1%** (trên máy, từ bản đồ float16, chưa kiểm chứng bằng mô hình):
+  - quyết định 180 PHUN / 2 CHƯA CHẮC / 34 KHÔNG PHUN (ở 1% là 104 / 9 / 103);
+  - ngưỡng phun 4,2–5,9 cm² (ở 1% là 24,8–33,0 cm²);
+  - số vùng cần bỏ để hết PHUN: trung vị 11 (tứ phân vị 5–22, lớn nhất 57), ở 1% là 9 (5–21, 48); 11 ô "mong manh" ở cả hai mức.
+
+### 3.4. Kết quả XAI và phản thực ở τ = 0,1% (15/11/2026)
+
+Người dùng chạy `colab_weeds_xai.ipynb` (thư mục Drive `xai_authors_msi3_tau0.001`). Kết quả được giải nén vào `results/weeds_xai/`; bản τ = 1% chép sang `data/ket_qua_cu_tau1/` (không commit).
+
+- **Đối chiếu quyết định:** 180 PHUN / 34 KHÔNG PHUN / 2 CHƯA CHẮC. Khớp `go_no_go.json` (sai khác 0,0); chấm lại không đổi ô nào.
+- **Độ đầy đủ của IG:** gần như không đổi so với τ = 1% (sai số tương đối trung vị 0,26%), vì IG tính theo ô, không phụ thuộc τ.
+- **Kiểm chứng độ trung thực trên 182 ô PHUN và CHƯA CHẮC** (ở τ = 1% là 113 ô). Mức che 1% số vùng của ô ảnh, tức 9 vùng = 9% diện tích một ô, là mức dùng trong báo cáo:
+
+| Cách chọn vùng để xóa | s giảm (τ 0,1% / 1%) | Ô PHUN bị đổi (0,1% / 1%) | Thắng ngẫu nhiên trong ô (0,1% / 1%) |
+|---|---|---|---|
+| IG | 62,5% / 63,5% | 30,6% / 45,2% | 99,5% (181/182) / 100% |
+| Bản đồ xác suất cỏ của mô hình | 68,6% / 66,6% | 40,6% / 46,2% | 99,5% / 100% |
+| Grad-CAM | 5,2% / 9,3% | 1,1% / 3,8% | 49,5% / 45,1% |
+| Ngẫu nhiên trong ô | −1,6% / 4,7% | 0,7% / 3,3% | – |
+
+  - **Kết luận giữ nguyên so với τ = 1%:** IG trung thực (thắng ngẫu nhiên cả ô ảnh ở 179/182 ô); Grad-CAM không giải thích được từng ô (khoảng 50%, như tung đồng xu); IG không hơn bản đồ xác suất cỏ của chính mô hình.
+  - Tỉ lệ ô PHUN bị đổi thấp hơn vì ngưỡng phun thấp hơn, nên phải xóa gần hết cỏ của ô mới hết PHUN.
+- **Phản thực, ước lượng nhanh** (`results/weeds_counterfactual/`, chạy trên máy 0,08 giây; module giờ ghi LF):
+  - 180 ô PHUN: số vùng cần bỏ để hết PHUN có trung vị 11 (tứ phân vị 5–22, lớn nhất 57); 11 ô chỉ cần 1 vùng, 44 ô tối đa 4 vùng.
+  - 2 ô CHƯA CHẮC: bỏ 1 vùng là KHÔNG PHUN.
+  - 34 ô KHÔNG PHUN: thêm 1,4–5,6 cm² cỏ dự đoán (trung vị 3,3) là thành PHUN.
+- **Ước lượng nhanh khớp mô hình kém hơn hẳn:**
+  - quyết định trùng ở 84,9% trường hợp (78,2% nếu chỉ tính trường hợp quyết định có đổi), so với 96,5% và 95,1% ở τ = 1%;
+  - 129/137 trường hợp lệch là ước lượng lạc quan;
+  - lý do: ngưỡng phun chỉ khoảng 4–6 cm² cỏ dự đoán, trong khi sai số trung vị của ước lượng 1–2 cm².
+  - **Lời giải thích trong bài phải dùng k đã được mô hình kiểm chứng** (bước 3 ở mục 6, 3b).
+
+### 3.5. Kiểm chứng phản thực bằng mô hình ở τ = 0,1% (15/11/2026)
+
+Người dùng chạy `colab_weeds_cfcheck.ipynb` (thư mục Drive `cfcheck_authors_msi3_tau0.001`; 5 251 lượt chạy mô hình, 4,9 phút, 1,6 giây mỗi ô). Kết quả ở `results/weeds_cfcheck/`; bản τ = 1% ở `data/ket_qua_cu_tau1/`. Mã băm `decisions.csv` và giá trị đất khớp kết quả XAI; 182 ô; chấm lại không đổi quyết định ô nào.
+
+| | τ = 0,1% | τ = 1% |
+|---|---|---|
+| Ô PHUN: k (bỏ đến vùng thứ mấy thì hết PHUN) theo mô hình = ước lượng | 59/180 (33%) | 46/104 (44%) |
+| Ô PHUN: lệch không quá 1 vùng | 97/180 (54%) | 81/104 (78%) |
+| Ô PHUN "mong manh" (ước lượng ≤ 2 vùng): đúng chính xác / lệch ≤ 1 | 16/22 / 20/22 | 14/18 / 18/18 |
+| Ô mô hình cần nhiều hơn ước lượng từ 20 vùng trở lên | 11 | 0 |
+| Ô bỏ hết 100 vùng vẫn chưa KHÔNG PHUN | 2 | 0 |
+| Ô quyết định đổi ngược lại khi bỏ thêm vùng (về PHUN / khỏi KHÔNG PHUN) | 30 / 37 | 5 / 5 |
+| Từng bước bỏ vùng: quyết định của ước lượng trùng mô hình | 68,0% | 91,7% |
+
+**Nguyên nhân: ngưỡng nằm sát "mức nền" của mô hình.**
+- Thay toàn bộ ô bằng đất trống (7 ô quét tới k = 100), mô hình vẫn chấm 3,1 cm² cỏ dự đoán (trung vị; lớn nhất 5,5 cm²). Đó là tổng các xác suất cỏ rất nhỏ trên 40 000 điểm ảnh.
+- Ngưỡng phun ở τ = 0,1% là 4,2–5,9 cm², ngưỡng không phun 3,75–4,34 cm².
+- Vì vậy quyết định nằm ở mức nhiễu của mô hình: có ô (`2023-05-30_0099` ô 3, ô 4, ô 7; `2023-05-25_0681` ô 1; `2023-05-25_0109` ô 1) ước lượng chỉ cần 3–8 vùng mà mô hình cần 89–100 vùng.
+- Sai số tuyệt đối của ước lượng không đổi (trung vị 3,6 cm², ở τ = 1% là 3,9 cm²); chỉ là so với ngưỡng nhỏ thì nó thành lớn.
+
+**Ý nghĩa khi viết bài:**
+- Bảo đảm conformal vẫn giữ (mục 3.3), nhưng lời giải thích "bỏ k vùng" kém ổn định hơn ở τ thấp.
+- Với các ô PHUN mong manh, lời giải thích vẫn đáng tin (20/22 lệch ≤ 1 vùng).
+- Đây là hạn chế của cách tính điểm s bằng trung bình xác suất: ngưỡng phải cao hơn mức nền của mô hình ở kích thước ô. Một hướng sửa (chưa làm): trừ mức nền đất trống khỏi s, hoặc tính diện tích cỏ từ lớp dự đoán (argmax) thay vì xác suất.
+
+### 3.6. Thử điểm s tính từ nhãn dự đoán (15/11/2026; mới thử, chưa đổi code)
+
+**Điểm thử:** s_hard = tỉ lệ điểm ảnh của ô mà mô hình xếp vào lớp cỏ (argmax). Trừ một hằng số khỏi s không có tác dụng: ngưỡng conformal dịch theo đúng hằng số đó, nên quyết định giữ nguyên.
+
+**Tài liệu:**
+- Popordanoska, Bertels, Vandermeulen, Maes & Blaschko, MICCAI 2021 (arXiv:2112.12560): trung bình xác suất từng điểm ảnh cho diện tích (thể tích) không lệch khi mô hình được hiệu chỉnh tốt trên từng ảnh; độ lệch bị chặn bởi sai số hiệu chỉnh. Mức nền của s là dấu hiệu hiệu chỉnh chưa tốt ở diện tích rất nhỏ.
+- Bản đồ phun từ phân vùng cỏ thường tính độ phủ cỏ của ô bằng tỉ lệ điểm ảnh được xếp vào lớp cỏ: Huang và cộng sự, *Sensors* 18(10):3299, 2018 (ngưỡng độ phủ 0–0,25, theo đoạn tóm tắt); Nikolić 2025 (mục 3.2, chưa xác nhận tạp chí).
+
+**Tầng quyết định** (từ bản đồ đã lưu, trên máy):
+- Ô không có cỏ theo nhãn (7 ô): điểm cũ trung vị 1,02 cm² (95% số ô dưới 3,07); điểm mới 0,00 cm² (95% dưới 0,40).
+- Mô hình chính, τ = 0,1%:
+  - đề tài: giảm 16,2%, 7 ô CHƯA CHẮC, bỏ sót 7,2%, phun nhầm 4,5% (điểm cũ: 15,7% / 2 / 6,7% / 4,5%);
+  - ngưỡng cố định: bỏ sót 6,2%, phun nhầm 4,5% (điểm cũ: 2,1% / 13,6%).
+- Số mô hình (trên 4) vượt giới hạn 10%, theo 7 mức τ (0; 0,06%; 0,1%; 0,31%; 0,5%; 1%; 2%):
+  - đề tài, điểm mới: 2, 0, 0, 0, 2, 0, 0 (điểm cũ: 2, 1, 1, 1, 1, 1, 0);
+  - ngưỡng cố định, điểm mới: 4, 2, 2, 3, 3, 2, 0 (điểm cũ: 4, 4, 4, 4, 2, 2, 1).
+- RGB, τ = 0,1%: đề tài bỏ sót 0% nhưng 36,1% ô CHƯA CHẮC (điểm cũ 21,8%); ngưỡng cố định bỏ sót 28,9%.
+
+**Phản thực, ô `2023-05-30_0099` ô 3** (mô hình chạy trên CPU):
+- điểm mới 14,0 cm², ngưỡng 3,62 / 4,38 cm²;
+- ước lượng và mô hình cùng thành KHÔNG PHUN ở k = 2 (điểm cũ: ước lượng 3, mô hình 96);
+- nhưng ở k = 4 mô hình lại PHUN (4,50 cm²), và khi đã bỏ hết 8 vùng có cỏ, mô hình vẫn thấy 2,38 cm² điểm ảnh cỏ mới, có thể là vết mép của các ô vuông đất trống dùng để che.
+
+### 3.7. Đã đổi điểm s sang tỉ lệ điểm ảnh cỏ (15/11/2026, người dùng chọn phương án A)
+
+**Code:**
+- `decision.predicted_weed(p_crop, p_weed)`: lớp có xác suất cao nhất là cỏ (argmax; bằng nhau thì lớp đứng trước), sau khi làm tròn hai xác suất về float16 như `train.evaluate` lưu. `cell_table(ids, y3, p_crop, p_weed, cell)`.
+- `analyze.SCORE = 'argmax'`, `PRIMARY['score']`, cột `score` trong `decision_metrics.csv`. `go_no_go` và `runs.decision_row` từ chối bảng không có cột này (điểm cũ). Thêm `analyze.write_results`.
+- `explain.py` (XAI_VERSION 3): `weed_pixels`, `cell_fractions`, `cell_scores` (điểm s, float64, khớp từng bit với `cell_table`), `cell_prob_scores` (P(cỏ) trung bình cho IG). Phép xóa vùng và mức quan trọng dải đo bằng s; cách xếp hạng `predicted_weed` = số điểm ảnh cỏ × 1024 + khối P(cỏ). Cột mới `p_model` trong `xai_cells.csv`.
+- `counterfactual.py`: xếp hạng vùng theo số điểm ảnh cỏ, bằng nhau thì theo P(cỏ) (`ranked_patches(..., tie=)`); ước lượng = trừ số điểm ảnh; module ghi LF.
+- `counterfactual_check.py` (CHECK_VERSION 2): `weed_map` trả về điểm ảnh cỏ và P(cỏ); chấm lại bằng s.
+- Demo (`ui.cells`, `pipeline.decide_tile/explain_estimate/estimate_steps`), `make_pipeline_figure.py`, `make_counterfactual_figure.py`: phần tính toán dùng điểm mới (chữ hiển thị chưa sửa).
+- Notebook: thư mục Drive `xai_authors_msi3_tau0.001_argmax`, `cfcheck_authors_msi3_tau0.001_argmax`; notebook mới `colab_weeds_runs_rescore.ipynb` (CPU; metadata không xin GPU) tính lại quyết định của 12 mô hình tự huấn luyện (6 lần chạy, mỗi lần có mô hình chọn theo val và mô hình epoch cuối) trên Drive, gói `ket_qua_weeds_runs_argmax.zip`. Review ngày 15/11: notebook dừng ở mục 2, trước khi ghi gì lên Drive, nếu thiếu kết quả hay bản đồ xác suất của bất kỳ mô hình nào (ví dụ mở bằng tài khoản Google khác; phiên 1 và lần chạy 2 nằm trên Drive khác), và không ghi `runs_summary.csv` thiếu dòng. Đã chạy thử code của notebook trên một Drive giả: mỗi file tính lại khớp từng byte với `analyze` trên máy cho cùng bản đồ xác suất, zip có đúng 55 tên file như `results/weeds_runs/`, xuống dòng LF.
+
+**Kiểm tra:** 93 test nhanh đạt; 4 test lỗi đúng dự kiến, vì so với kết quả XAI, phản thực đang lưu bằng điểm cũ. Test chậm đạt: XAI toàn quy trình, mọi trang demo, upload. Test upload nay tự chọn ảnh "ngoài bộ dữ liệu" theo quy tắc cố định: ô val đầu tiên có đủ 3 quyết định, đổi tên. Mô hình chạy trên CPU khác bản đồ Colab ở 2–10 trên 360 000 điểm ảnh; điểm ô lệch tối đa 0,125 cm².
+
+**Kết quả quyết định mới (τ = 0,1%, tính trên máy):**
+- 5 dải: GO, giảm 16,2%, CHƯA CHẮC 3,2% (7 ô), bỏ sót 7,2%, phun nhầm 4,5%.
+- RGB: NO-GO vì C3: CHƯA CHẮC 36,1%, bỏ sót 0%, phun nhầm 4,5%, giảm 9,7%.
+- Lần chạy thử 1: NO-GO (C1, và CHƯA CHẮC 31,9%). Lần chạy thử 2: GO, giảm 17,1%, CHƯA CHẮC 0,9%, bỏ sót 8,2%, phun nhầm 4,5%.
+- **12 mô hình tự huấn luyện** (tính lại trên Drive bằng `colab_weeds_runs_rescore.ipynb`, 15/11, giải nén vào `results/weeds_runs/`). Kiểm tra trước khi giải nén: 30 file json huấn luyện giống từng byte bản trên máy (đúng các mô hình của phiên 2), mỗi `go_no_go.json` khớp kết luận tính lại từ `decision_metrics.csv` của nó, `runs_summary.csv` giữ nguyên các cột huấn luyện.
+  - Kết luận không đổi ở cả 12 dòng: 11 GO, 1 NO-GO (`es_seed1` epoch cuối, vì C1: mIoU 66,93).
+  - 11 mô hình khác nhau (10 mô hình của `runs_summary.csv` và lần chạy 2): 10 GO; giảm 13,4–19,0%; CHƯA CHẮC 0–6,9%; phun nhầm 0–9,1% (0–2 trên 22 ô không cần phun); bỏ sót 3,6–10,3% (7–20 trên 194 ô cần phun).
+  - `es_seed2` (chọn theo val) bỏ sót 20 ô, hơn mức α × 194 = 19,4 ô đúng một ô. Bảo đảm conformal chỉ đúng theo kỳ vọng, nên một lần đo trên 194 ô có thể vượt; phải báo cáo đúng như vậy. Các ô KHÔNG PHUN của mọi mô hình chỉ chứa 0,35–0,84% tổng diện tích cỏ (`missed_weed_area`).
+  - So với điểm cũ (cùng τ = 0,1%, 12 dòng): phun nhầm 4,5–13,6% thành 0–9,1%; hai mô hình phun nhầm 13,6% (3/22 ô, vượt β) nay còn 4,5%. CHƯA CHẮC 0,5–26,4% thành 0–6,9%; `e100_seed2` (chọn theo val) giảm từ 26,4% xuống 3,2%. Bỏ sót 6,2–9,8% thành 3,6–10,3%; giảm 14,4–18,5% thành 13,4–19,0%.
 
 ## 4. Code
 
@@ -203,6 +394,7 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
   - giảm thuốc 49,5–51,4%;
   - chưa quyết 0–7,9%;
   - bỏ sót tối đa 8,3%, phun nhầm tối đa 7,4%, cả hai đều dưới α = β = 10%.
+  - Các số trên ở τ = 1% với điểm s cũ. Ở thiết lập chính hiện tại (τ = 0,1%, điểm mới) xem mục 3.7: một mô hình bỏ sót 10,3%, vượt α đúng một ô.
 - Lần chạy 2 không có trên Drive của phiên Colab này, nên mô hình epoch cuối của nó chưa được đánh giá.
 
 **Hạn chế:** lịch 100 epoch và lịch dừng sớm mỗi lịch có 3 seed, lịch cosine chỉ có 1; kết quả huấn luyện không tất định, nên cần báo cáo theo phân bố, không theo một lần chạy; tập test nhỏ (26 ô ảnh, 8 vị trí), nên các tỉ lệ bỏ sót và phun nhầm chỉ dựa trên 1–3 ô lưới; mIoU chỉ vượt ngưỡng C1 1,35 điểm.
@@ -390,7 +582,14 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
      - Để xuất PDF: chạy `python scripts/embed_report_images.py`, script sinh `data/weedsgalore/BAO_CAO_TIEN_DO_co_hinh.md` có hình nhúng sẵn (không commit vì chứa ảnh của bộ dữ liệu). Sửa chữ thì sửa bản trong `docs/` rồi chạy lại script.
      - Đã review 4 lần theo yêu cầu người dùng; mọi câu có số liệu hoặc khẳng định đều được kiểm bằng file kết quả, code, hoặc PDF của bài báo (Celikkan 2025 trang 4 và 8, Celikkan 2023 trang 1, Melki 2025 trang 1–3 và 7–10, code của tác giả trên GitHub).
    - **Việc tiếp theo:** gửi báo cáo cho thầy; có thể cập nhật thêm artifact báo cáo cũ (https://claude.ai/artifact/J1XPMkEg2d4pwGXoFKVeCs).
-3. **Đọc toàn văn các bài về ngưỡng phun** để thay τ minh họa bằng ngưỡng có nguồn.
+0. **Việc chính từ 14/11: viết bài báo 12–15 trang trên Overleaf** theo chỉ đạo của thầy (mục 1), có thực nghiệm đối sánh với các nghiên cứu khác. Đề án làm sau.
+3. **Ngưỡng phun:** đã tra cứu (mục 3.2) và đổi τ chính sang 0,1% (mục 3.3). Còn đọc Ali 2015 và toàn văn Nikolić 2025.
+3c. **Chạy lại với điểm s mới (mục 3.7):** (1) người dùng chạy `colab_weeds_runs_rescore.ipynb` (CPU, độc lập với các bước sau; **xong 15/11**, đã kiểm tra và giải nén, kết quả ở mục 3.7) và `colab_weeds_xai.ipynb` (GPU; chưa chạy); (2) Claude giải nén (với zip của `runs_rescore`: trước khi giải nén đè, so `segmentation_metrics.json`, `best.json`, `train_done.json`, `history.json` trong zip với bản trên máy; phải giống từng byte, khác là mô hình của phiên hay tài khoản khác), chạy `src.weeds.counterfactual`, sinh lại `colab_weeds_cfcheck.ipynb`; (3) người dùng chạy notebook đó; (4) Claude cập nhật hình, demo (chữ còn ghi "trung bình xác suất cỏ", τ = 1%), báo cáo, rồi chạy lại toàn bộ test.
+3b. **Chạy lại XAI ở τ = 0,1% (bước 1–3 xong ngày 15/11, kết quả ở mục 3.4 và 3.5; bước 4 chuyển sang 3c vì đã đổi điểm s):**
+   1. Người dùng chạy `notebooks/colab_weeds_xai.ipynb`; kết quả ghi vào thư mục Drive mới `xai_authors_msi3_tau0.001`. Notebook đối chiếu quyết định với `go_no_go.json` mới, và xai_config.json ghi cả thiết lập chính. Tải `ket_qua_weeds_xai.zip`, giải nén vào thư mục gốc repo (ghi đè `results/weeds_xai/`). Bản cũ của các file csv/json còn trong git; riêng `xai_maps.npz` thì không, muốn giữ thì đổi tên thư mục cũ trước khi giải nén.
+   2. Claude chạy `src.weeds.counterfactual` trên máy (lệnh ở mục 2b), rồi chạy lại `scripts/make_weeds_notebook.py`. Notebook kiểm chứng phản thực chỉ nhúng quyết định khi `results/weeds_xai/xai_config.json` có đúng thiết lập chính; nếu chưa, notebook dừng ở mục 4.
+   3. Người dùng chạy `notebooks/colab_weeds_cfcheck.ipynb` (thư mục Drive mới `cfcheck_authors_msi3_tau0.001`), giải nén vào `results/weeds_cfcheck/`.
+   4. Claude cập nhật hình (`make_counterfactual_figure.py`, `make_pipeline_figure.py` có chữ "ngưỡng minh họa", và in τ với 0 chữ số thập phân nên sẽ ra "0%"), demo (`ui.SOURCE`, trang Tổng quan, Dữ liệu, Giải thích, Chạy thử: còn ghi "τ = 1%" hoặc in "0%"), báo cáo; chạy lại test (kể cả `WEEDS_SLOW_TESTS=1`).
 4. **Thiết kế cách hiệu chỉnh lại khi sang đợt bay mới:** hiệu chỉnh riêng từng ngày hiện có quá ít mẫu.
 5. **Mô-đun giải thích (XAI)** và phép kiểm chứng độ trung thực: đã chạy (mục 2b). Còn lại phần hình, lời giải thích bằng chữ và đưa vào báo cáo.
 

@@ -96,19 +96,26 @@ def test_removed_patches_are_the_cells_own():
 def test_scan_matches_one_image_at_a_time():
     """With a model that sees context and whose score need not fall monotonically: an independent ranking and every
     k scored one image at a time give the same patches, scores, first changes and reversals as the batched scan."""
-    torch.manual_seed(2)
+    torch.manual_seed(3)  # a random model whose weed pixels in cell 0 change with the removals, not always downwards
     model = DeepLabV3Plus(5, 3, pretrained_backbone=False).eval()
-    x = torch.rand(5, SIZE, SIZE, generator=torch.Generator().manual_seed(3))
+    x = torch.rand(5, SIZE, SIZE, generator=torch.Generator().manual_seed(4))
 
-    def score(img):  # mean P(weed) over cell 0, one image per pass
+    def score(img):  # share of weed pixels in cell 0, one image per pass
         with torch.no_grad():
-            return float(torch.softmax(model(img[None]), 1)[0, 2, :CELL, :CELL].double().mean())
+            return float(E.weed_pixels(model(img[None]))[0, :CELL, :CELL].double().mean())
 
     with torch.no_grad():
-        p = torch.softmax(model(x[None]), 1)[0, 2]
-    mass = {i * 8 + j: float(p[i * PATCH:(i + 1) * PATCH, j * PATCH:(j + 1) * PATCH].double().sum())
-            for i in range(4) for j in range(4)}  # cell 0 = rows 0-3, columns 0-3 of the 8 x 8 patch grid
-    ranking = sorted(mass, key=lambda k: -mass[k])
+        logits = model(x[None])
+    weed, p = E.weed_pixels(logits)[0], torch.softmax(logits.float(), 1)[0, 2]
+
+    def patch_of(m, k):  # cell 0 = rows 0-3, columns 0-3 of the 8 x 8 patch grid
+        i, j = divmod(k, 8)
+        return m[i * PATCH:(i + 1) * PATCH, j * PATCH:(j + 1) * PATCH]
+
+    keys = [i * 8 + j for i in range(4) for j in range(4)]
+    count = {k: int(patch_of(weed, k).sum()) for k in keys}
+    mass = {k: float(patch_of(p, k).double().sum()) for k in keys}
+    ranking = sorted(keys, key=lambda k: (-count[k], -mass[k], k))  # weed pixels, then P(weed) mass
     curve = []
     for k in range(17):
         img = x.clone()
@@ -172,7 +179,7 @@ def test_run_resumes_and_merges(tmp_path, monkeypatch):
                         y=np.zeros((2, SIZE, SIZE), np.uint8))
     decisions = pd.concat([cells_table().assign(tile=ids[0]),
                            pd.DataFrame({'tile': ids[1], 'date': '2023-05-30', 'cell': [0, 1], 'decision':
-                                         [NO_SPRAY, DEFER], 'lam_lo': 0.03, 'lam_hi': 1e-6})])
+                                         [NO_SPRAY, DEFER], 'lam_lo': [0.03, -np.inf], 'lam_hi': [1e-6, 0.5]})])
     decisions.to_csv(tmp_path / 'decisions.csv', index=False)
     (tmp_path / 'soil.json').write_text(json.dumps({'bands': list(BANDS), 'values': BASE.tolist()}))
     monkeypatch.setattr(C, 'load_checkpoint', lambda *a: PixelModel())
@@ -194,10 +201,9 @@ def test_run_resumes_and_merges(tmp_path, monkeypatch):
     summary = json.loads((out / 'cfcheck_summary.json').read_text())
     assert summary['cells'] == 3 and summary['decisions'] == {'spray': 2, 'defer': 1}
     assert summary['rescored_decision_differs'] == 0 and summary['k_not_spray']['exact'] == 2
-    # cell 3 (lam_lo = -inf) never reaches NO_SPRAY. The all-soil DEFER cell does under the estimate, which takes a
-    # removed patch to P(weed) = 0 and so falls below lam_hi = 1e-6, but not under the model, which still gives bare
-    # soil about 2e-5: the kind of gap the check is there to measure
-    assert summary['k_no_spray']['estimate_not_reached'] == 1 and summary['k_no_spray']['model_not_reached'] == 2
+    # cell 3 and the all-soil DEFER cell (lam_lo = -inf) never reach NO_SPRAY. Bare soil has no weed pixel: the
+    # soil cell scores exactly 0 for the model as for the estimate (the mean P(weed) gave it about 2e-5)
+    assert summary['k_no_spray']['estimate_not_reached'] == 2 and summary['k_no_spray']['model_not_reached'] == 2
     assert summary['forward_passes'] > 0
     # a second run reuses every finished tile; other settings in the same folder are refused
     before = {p.name: p.stat().st_mtime_ns for p in (out / 'parts').iterdir()}

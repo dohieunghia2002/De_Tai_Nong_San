@@ -24,7 +24,7 @@ from export_weeds_images import B, G, R, band_limits, composite, date_vi  # noqa
 from src.weeds.analyze import PRIMARY  # noqa: E402
 from src.weeds.counterfactual import GSD_CM, PATCH  # noqa: E402
 from src.weeds.data import BANDS, SPLITS, TILE, read_tile, split_ids  # noqa: E402
-from src.weeds.decision import DEFER, NO_SPRAY, SPRAY  # noqa: E402
+from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, predicted_weed  # noqa: E402
 
 CELL = PRIMARY['cell_size']
 CELL_CM2 = (CELL * GSD_CM) ** 2  # 2500 cm^2: a 50 cm x 50 cm cell
@@ -389,9 +389,10 @@ def load_inputs(root):
     return cells, steps
 
 
-def check_example(c, p_cell):
-    """The saved probability map gives the Colab run's cell score, and both rankings name the same patches."""
-    s = float(p_cell.astype(np.float64).mean())
+def check_example(c, w_cell):
+    """The saved maps give the Colab run's cell score (w_cell: the cell's weed pixels from them), and both rankings
+    name the same patches."""
+    s = float(w_cell.astype(np.float64).mean())
     if abs(s - c['s_model']) > SCORE_TOL:
         raise ValueError(f'{c["tile"]} cell {c["cell"]}: score {s:.6f} from the saved map, {c["s_model"]:.6f} on Colab')
     a, b = str(c['patches']).split(), str(c['patches_local']).split()
@@ -421,7 +422,7 @@ def main():
     cells, steps = load_inputs(ROOT_DIR)
     examples = pick_examples(cells)
     with np.load(args.probs) as p:
-        ids, p_weed = list(p['ids'].astype(str)), p['p_weed']
+        ids, p_crop, p_weed = list(p['ids'].astype(str)), p['p_crop'], p['p_weed']
     with zipfile.ZipFile(args.zip) as zf:
         lo, hi = band_limits(zf, sorted(t for s in SPLITS for t in split_ids(zf, s)))  # as the preview images
         tiles = {c['tile']: read_tile(zf, c['tile'])[0] for _, c in examples}
@@ -434,8 +435,9 @@ def main():
         subs = fig.subfigures(len(examples) + 1, 1, height_ratios=[5.0] * len(examples) + [1.3])
     for i, ((key, c), sub) in enumerate(zip(examples, subs), start=1):
         r, col = divmod(int(c['cell']), TILE // CELL)
-        p_cell = p_weed[ids.index(c['tile'])][r * CELL:(r + 1) * CELL, col * CELL:(col + 1) * CELL]
-        check_example(c, p_cell)
+        i, sl = ids.index(c['tile']), (slice(r * CELL, (r + 1) * CELL), slice(col * CELL, (col + 1) * CELL))
+        p_cell = p_weed[i][sl]
+        check_example(c, predicted_weed(p_crop[i][sl], p_cell))
         st = steps[(steps['tile'] == c['tile']) & (steps['cell'] == c['cell'])].sort_values('k')
         rgb = composite(tiles[c['tile']], (R, G, B), lo, hi)
         if args.simple:

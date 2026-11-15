@@ -35,7 +35,7 @@ def test_three_class_merge(val):
 def test_perfect_probabilities_end_to_end(val):
     # labels used as probabilities: the cell score must equal the true weed fraction and nothing may be missed
     y3 = to_3class(val['y'])
-    t = cell_table(val['ids'], y3, (y3 == 2).astype(np.float32), 200)
+    t = cell_table(val['ids'], y3, np.zeros(y3.shape, np.float32), (y3 == 2).astype(np.float32), 200)
     assert len(t) == 26 * 9
     np.testing.assert_allclose(t['s'], t['w'], atol=1e-6)
     rows = {r['policy']: r for r in evaluate_policies(t, t, tau=0.01, alpha=0.1, beta=0.1)}

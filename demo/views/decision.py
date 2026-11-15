@@ -88,7 +88,8 @@ st.caption(f'{C.MODELS[key]["label"]} · {n} ô {side_cm(cell)} × {side_cm(cell
 c1, c2, c3, c4 = st.columns(4)
 c1.metric('Giảm diện tích phun', ui.pct(cf['spray_reduction']), border=True,
           help=f'Mức tốt nhất có thể (biết trước đáp án): {ui.pct(m.loc["oracle", "spray_reduction"])}.')
-c2.metric('Ô CHƯA CHẮC', f'{ui.pct(cf["deferred"])} · {int(cf["n_deferred"])} ô', border=True)
+c2.metric('Ô CHƯA CHẮC', f'{ui.pct(cf["deferred"])} · {int(cf["n_deferred"])} ô', border=True,
+          help='Người ra xem, cần thì phun.')
 c3.metric(f'Bỏ sót (giới hạn {ui.pct(alpha, 0)})', f'{ui.pct(cf["missed_need_rate"])} · {int(cf["n_missed"])} ô',
           border=True)
 c4.metric(f'Phun nhầm (giới hạn {ui.pct(beta, 0)})',
@@ -169,17 +170,16 @@ st.subheader('Xem chi tiết một ô ảnh')
 tiles = list(dict.fromkeys(cells['tile']))
 tile_id = st.selectbox('Ô ảnh', tiles, format_func=lambda t: f'{t} · vị trí {loc[t]} · bay ngày {C.date_vi(t)}')
 g = cells[cells['tile'] == tile_id]
-left, right = st.columns([3, 2])
-with left:
-    ui.figure('tile_decisions', ui.rgb(tile_id), g, policy, cell, tau,
-              f'{tile_id}: "máy thấy" = lượng cỏ dự đoán, "nhãn thật" = cỏ theo nhãn')
-with right:
-    view = pd.DataFrame({'Ô': g['cell'] + 1, 'Quyết định': [C.DECISION_VI[int(d)] for d in g[policy]],
-                         'Cỏ dự đoán': [ui.pct(v, 2) for v in g['s']], 'Cỏ theo nhãn': [ui.pct(v, 2) for v in g['w']],
-                         'Cần phun?': np.where(g['need'], 'có', 'không')})
-    st.dataframe(view, hide_index=True)
-    st.caption('Ô được đánh số từ trái sang phải, trên xuống dưới. Muốn biết vì sao một ô PHUN hay CHƯA CHẮC, xem '
-               'trang 4 (giải thích có cho thiết lập chính và mô hình chính).')
+# the figure at its own size and the table over the full width below it: side by side, a 1280 px screen shrank the
+# figure and cut the table's last column
+ui.figure('tile_decisions', ui.rgb(tile_id), g, policy, cell, tau,
+          f'{tile_id}: "máy thấy" = lượng cỏ dự đoán, "nhãn thật" = cỏ theo nhãn', width='content')
+view = pd.DataFrame({'Ô': g['cell'] + 1, 'Quyết định': [C.DECISION_VI[int(d)] for d in g[policy]],
+                     'Cỏ dự đoán': [ui.pct(v, 2) for v in g['s']], 'Cỏ theo nhãn': [ui.pct(v, 2) for v in g['w']],
+                     'Cần phun?': np.where(g['need'], 'có', 'không')})
+st.dataframe(view, hide_index=True)
+st.caption('Ô được đánh số từ trái sang phải, trên xuống dưới. Muốn biết vì sao một ô PHUN hay CHƯA CHẮC, xem '
+           'trang 4 (giải thích có cho thiết lập chính và mô hình chính).')
 
 st.subheader('Lượng cỏ dự đoán so với lượng cỏ thật')
 plot = cells.assign(s_pct=100 * cells['s'], w_pct=100 * cells['w'],

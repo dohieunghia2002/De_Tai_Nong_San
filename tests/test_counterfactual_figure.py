@@ -94,9 +94,9 @@ def test_simple_lines():
     steps = steps_for([0.15] + [0.012] * 28 + [0.009], [SPRAY] * 29 + [NO_SPRAY], [0.15] * 30)
     assert F.simple_lines(c, steps)[1] == ('Phải bỏ tới 29 vùng có viền (29% diện tích ô) mới hết PHUN '
                                            '(thành KHÔNG PHUN), nên quyết định phun khó đổi.')
-    # DEFER, and a cell that does not need spraying
+    # DEFER, and a cell that does not need spraying (half the primary tau, whatever tau is)
     c = cell_row(DEFER, 0.011, 0, 1)
-    c['w'] = 0.005
+    c['w'] = F.PRIMARY['tau'] / 2
     why, change, truth = F.simple_lines(c, steps_for([0.011, 0.007], [DEFER, NO_SPRAY], [0.011, 0.0068]))
     assert 'giữa ngưỡng không phun 25 cm² và ngưỡng phun 33 cm² → CHƯA CHẮC' in why
     assert change == 'Bỏ vùng số 1 → KHÔNG PHUN. Người kiểm tra nên xem vùng này trước.'

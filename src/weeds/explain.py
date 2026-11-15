@@ -1,17 +1,21 @@
 """Explanations of the per-cell spraying decisions, and a test of whether they are faithful.
 
-A cell's decision depends only on its score s = mean P(weed) over the cell (src.weeds.decision), so explaining the
-decision means explaining s: which input pixels and which spectral bands raise it. The model has a large receptive
-field, so pixels outside the cell can matter too; attributions cover the whole tile.
+A cell's decision depends only on its score s, the share of its pixels whose most probable class is weed
+(src.weeds.decision), so explaining the decision means explaining s: which input pixels and which spectral bands
+raise it. The model has a large receptive field, so pixels outside the cell can matter too; attributions cover the
+whole tile.
 
-Attributions of s, compared:
+s counts pixels, so it has no gradient. The gradient methods explain the cell's mean P(weed) instead, the smooth
+quantity whose argmax gives the weed pixels (a surrogate of s); everything tied to the decision (s, the deletion test,
+SPRAY flips, band importance) uses s itself. Attributions compared:
   integrated_gradients   Sundararajan et al. 2017 (ICML), from a 'bare soil' baseline: every band of every pixel set
                          to the band's median over background pixels of the training split. Attributions per pixel
-                         and band sum to s(x) - s(baseline) (completeness, checked and reported).
+                         and band sum to p(x) - p(baseline), p the cell's mean P(weed) (completeness, checked).
   grad_cam               Selvaraju et al. 2017 (ICCV), on the decoder features (stride 4) that feed the classifier.
-  predicted_weed         the model's own P(weed) inside the cell, a reference that needs no explanation method.
+  predicted_weed         the model's own weed pixels inside the cell (ties: the larger P(weed) mass), a reference
+                         that needs no explanation method; the ranking of the counterfactuals of src.weeds.counterfactual.
 Band importance: each band in turn is replaced by its bare-soil value over the whole tile, and the drop in s recorded.
-Gradients are taken of the cell's SUM of P(weed) (cell^2 times s) and scaled back: under float16 autocast the
+Gradients are taken of the cell's SUM of P(weed) (cell^2 times its mean) and scaled back: under float16 autocast the
 gradient of a 40 000-pixel mean underflows to zero.
 
 Faithfulness (deletion test, Petsiuk et al. 2018, with random controls), for the SPRAY and DEFER cells: the patches
@@ -40,15 +44,17 @@ import torch.nn.functional as F
 from src.weeds.analyze import PRIMARY, clean, primary_decisions, test_location_folds
 from src.weeds.authors import load_checkpoint
 from src.weeds.data import BANDS, load_npz, to_3class
-from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, cell_table, decide_conformal, decision_metrics
+from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, cell_table, decide_conformal, decision_metrics, needs_spray
 from src.weeds.train import evaluate
 
-XAI_VERSION = 2  # bump when an explanation or the deletion test changes: parts of another version are not merged
+XAI_VERSION = 3  # bump when an explanation or the deletion test changes: parts of another version are not merged
+# (3, 15/11/2026: s is the share of weed pixels; the deletion test and band importance measure it)
 WEED = 2
 METHODS = ('integrated_gradients', 'grad_cam', 'predicted_weed')
 CONTROLS = ('random_tile', 'random_cell')
 FRACTIONS = (0.005, 0.01, 0.02, 0.05, 0.1)  # share of the tile's patches removed in the deletion test
 MAP_POOL = 4  # attribution maps are stored average-pooled 4 x 4 (600 -> 150 px)
+WEED_RANK = 1024  # predicted_weed ranking: weed pixels x WEED_RANK + P(weed) mass (a 20 px patch has at most 400)
 
 
 def autocast(x, amp):
@@ -72,8 +78,32 @@ def weed_prob(logits):
     return torch.softmax(logits.float(), dim=1)[:, WEED]
 
 
+def weed_pixels(logits):
+    """Pixels whose most probable class is weed, (n, H, W) bool, exactly as decision.predicted_weed finds them on the
+    stored maps: softmax in float32, P(crop) and P(weed) rounded to float16 (as train.evaluate stores them), argmax
+    with ties going to the earlier class (background, crop, weed)."""
+    p = torch.softmax(logits.float(), dim=1)[:, 1:].half().float()
+    pc, pw = p[:, 0], p[:, 1]
+    return (pw > pc) & (pw > 1 - pc - pw)
+
+
+def cell_fractions(weed, cell):
+    """Share of weed pixels in every cell, (n, H / cell, W / cell) in float64: pixel counts, then one division, the
+    same number decision.cell_table gives for the stored maps."""
+    n, h, w = weed.shape
+    return weed.double().view(n, h // cell, cell, w // cell, cell).sum((2, 4)) / (cell * cell)
+
+
 def cell_scores(model, x, cell, amp=True):
-    """Score s of every cell, (n, H / cell, W / cell), for a batch x (n, bands, H, W) scaled to [0, 1]."""
+    """Decision score s of every cell, (n, H / cell, W / cell) in float64, for a batch x (n, bands, H, W) in [0, 1]."""
+    with autocast(x, amp):
+        logits = model(x)
+    return cell_fractions(weed_pixels(logits), cell)
+
+
+def cell_prob_scores(model, x, cell, amp=True):
+    """Mean P(weed) of every cell, (n, H / cell, W / cell): the smooth surrogate of s that the gradient methods
+    explain."""
     with autocast(x, amp):
         logits = model(x)
     return F.avg_pool2d(weed_prob(logits)[:, None], cell)[:, 0]
@@ -86,8 +116,8 @@ def cell_sum(p, rc, cell):
 
 
 def integrated_gradients(model, x, base, rc, cell, steps=32, batch=4, amp=True):
-    """Attributions (bands, H, W) of the score of cell rc for one tile x (bands, H, W), from the bare-soil image, by
-    the midpoint rule over `steps` points; also s(x) - s(baseline), which the attributions should sum to."""
+    """Attributions (bands, H, W) of the mean P(weed) of cell rc for one tile x (bands, H, W), from the bare-soil
+    image, by the midpoint rule over `steps` points; also p(x) - p(baseline), which the attributions should sum to."""
     base_img = base.view(-1, 1, 1).expand_as(x)
     diff = x - base_img
     grad_sum = torch.zeros_like(x)
@@ -99,12 +129,13 @@ def integrated_gradients(model, x, base, rc, cell, steps=32, batch=4, amp=True):
         total = cell_sum(weed_prob(logits), rc, cell).sum()  # cell^2 * s per image, kept large for float16
         grad_sum += torch.autograd.grad(total, xi)[0].float().sum(0)
     with torch.no_grad():
-        s_x, s_base = cell_scores(model, torch.stack([x, base_img]), cell, amp)[:, rc[0], rc[1]].tolist()
+        s_x, s_base = cell_prob_scores(model, torch.stack([x, base_img]), cell, amp)[:, rc[0], rc[1]].tolist()
     return diff * grad_sum / (steps * cell * cell), s_x - s_base
 
 
 def grad_cams(model, x, cells_rc, cell, amp=True):
-    """Grad-CAM map (H, W) of the score of each cell in cells_rc, on decoder features computed once for the tile."""
+    """Grad-CAM map (H, W) of the mean P(weed) of each cell in cells_rc, on decoder features computed once for the
+    tile."""
     with torch.no_grad(), autocast(x, amp):
         feat = model.features(x[None])
     maps = []
@@ -119,8 +150,9 @@ def grad_cams(model, x, cells_rc, cell, amp=True):
 
 
 def patch_sums(m, patch):
-    """Sum of a map (H, W) over each patch: (H / patch, W / patch)."""
-    return F.avg_pool2d(m[None, None].float(), patch)[0, 0] * patch * patch
+    """Sum of a map (H, W) over each patch: (H / patch, W / patch), in float64 so that the predicted_weed ranking
+    (weed pixels x WEED_RANK + P(weed) mass) keeps its tie-break."""
+    return F.avg_pool2d(m[None, None].double(), patch)[0, 0] * patch * patch
 
 
 def top_mask(scores, n):
@@ -201,8 +233,10 @@ def explain_tile(model, x, base, cells, cell, patch, rng, steps=32, draws=10, ig
     n_cols = x.shape[2] // cell
     with torch.no_grad():
         with autocast(x, amp):
-            pred = weed_prob(model(x[None]))[0]
-        s_model = F.avg_pool2d(pred[None, None], cell)[0, 0]
+            logits = model(x[None])
+        pred, weed = weed_prob(logits)[0], weed_pixels(logits)[0]
+        s_model = cell_fractions(weed[None], cell)[0]  # the decision score, rescored here
+        p_model = F.avg_pool2d(pred[None, None], cell)[0, 0]  # what the gradient methods explain
     ablation = band_ablation(model, x, base, cell, amp)
     rcs = [divmod(int(k), n_cols) for k in cells['cell']]
     cams = grad_cams(model, x, rcs, cell, amp)
@@ -213,13 +247,15 @@ def explain_tile(model, x, base, cells, cell, patch, rng, steps=32, draws=10, ig
         ig_maps.append(F.avg_pool2d(ig_map[None, None], MAP_POOL)[0, 0].cpu().numpy())
         cam_maps.append(F.avg_pool2d(cam[None, None], MAP_POOL)[0, 0].cpu().numpy())
         k = int(c['cell'])
-        cell_rows.append({'cell': k, 's_model': float(s_model[rc]), 'ig_gap': gap, 'ig_sum': float(ig_map.sum()),
+        cell_rows.append({'cell': k, 's_model': float(s_model[rc]), 'p_model': float(p_model[rc]), 'ig_gap': gap,
+                          'ig_sum': float(ig_map.sum()),
                           **{f'ig_{b}': v for b, v in zip(BANDS, attr.sum((1, 2)).tolist())},
                           **{f'ablate_{b}': float(ablation[i][rc]) for i, b in enumerate(BANDS)}})
         if c['decision'] in (SPRAY, DEFER):
-            in_cell = torch.zeros_like(pred)
+            in_cell = torch.zeros_like(pred, dtype=torch.float64)
             in_cell[rc[0] * cell:(rc[0] + 1) * cell, rc[1] * cell:(rc[1] + 1) * cell] = 1
-            tested[k] = (rc, {'integrated_gradients': ig_map, 'grad_cam': cam, 'predicted_weed': pred * in_cell})
+            own = (weed.double() * WEED_RANK + pred.double()) * in_cell  # weed pixels first, then P(weed) mass
+            tested[k] = (rc, {'integrated_gradients': ig_map, 'grad_cam': cam, 'predicted_weed': own})
     t1 = time.time()
     dels = deletion_tile(model, x, base, tested, cell, patch, rng, draws=draws, batch=batch, amp=amp) if tested else []
     maps = {'integrated_gradients': np.stack(ig_maps), 'grad_cam': np.stack(cam_maps)}
@@ -228,14 +264,14 @@ def explain_tile(model, x, base, cells, cell, patch, rng, steps=32, draws=10, ig
 
 def decisions_for_test(model, test, dev):
     """The model's decisions in the primary setting, from its probabilities on the test split (src.weeds.analyze)."""
-    _, probs = evaluate(model, test, dev, keep_probs=True)
-    cells = cell_table(test['ids'], to_3class(test['y']), probs[:, 1], PRIMARY['cell_size'])
+    _, probs = evaluate(model, test, dev, keep_probs=True)  # P(crop), P(weed) in float16, as stored
+    cells = cell_table(test['ids'], to_3class(test['y']), probs[:, 0], probs[:, 1], PRIMARY['cell_size'])
     return primary_decisions(cells, test_location_folds(list(test['ids'])))
 
 
 def decision_check(t, expected):
     """Decision metrics and thresholds of table t next to those reported for the same model (a go_no_go.json)."""
-    m = decision_metrics(t['decision'].to_numpy(), t['w'].to_numpy() >= PRIMARY['tau'], t['w'].to_numpy(),
+    m = decision_metrics(t['decision'].to_numpy(), needs_spray(t['w'], PRIMARY['tau']), t['w'].to_numpy(),
                          t['crop'].to_numpy())
     lam = t.groupby('fold')[['lam_lo', 'lam_hi']].first()
     got = {'spray_reduction': m['spray_reduction'], 'deferred': m['deferred'],
@@ -260,7 +296,7 @@ def faithfulness(deletion, cells):
     df = deletion.merge(cells[['tile', 'cell', 's_model', 'lam_lo', 'lam_hi']], on=['tile', 'cell'])
     df['spray_before'] = decide_conformal(df['s_model'], df['lam_lo'], df['lam_hi']) == SPRAY
     df['drop'] = df['s_model'] - df['s_after']
-    df['rel_drop'] = df['drop'] / df['s_model']
+    df['rel_drop'] = df['drop'] / df['s_model'].where(df['s_model'] > 0)  # a DEFER cell may have no weed pixel
     df['flipped'] = decide_conformal(df['s_after'], df['lam_lo'], df['lam_hi']) != SPRAY
     per_cell = df.groupby(['tile', 'cell', 'spray_before', 'method', 'fraction'], as_index=False)[
         ['drop', 'rel_drop', 'flipped']].mean()
@@ -282,8 +318,9 @@ def run(args, dev):
     out = Path(args.out)
     parts = out / 'parts'
     parts.mkdir(parents=True, exist_ok=True)
+    # the primary setting too (tau, ...): its decisions fix which cells are explained, so a folder never mixes two
     config = {'version': XAI_VERSION, 'ckpt': Path(args.ckpt).name,
-              **{k: getattr(args, k) for k in ('steps', 'patch', 'draws', 'seed', 'amp')}}
+              **{k: getattr(args, k) for k in ('steps', 'patch', 'draws', 'seed', 'amp')}, 'primary': PRIMARY}
     if (out / 'xai_config.json').exists() and json.loads((out / 'xai_config.json').read_text()) != config:
         raise ValueError(f'{out} holds results made with other settings ({(out / "xai_config.json").read_text()}); '
                          f'this run has {config}: use a new output folder')

@@ -1,6 +1,7 @@
-"""Decision-level counterfactual explanations of the spraying decisions, computed from the P(weed) map alone.
+"""Decision-level counterfactual explanations of the spraying decisions, computed from the model's maps alone.
 
-A cell's decision is a threshold rule on its score s = mean P(weed) over the cell (src.weeds.decision), so it can be
+A cell's decision is a threshold rule on its score s, the share of its pixels predicted as weed (src.weeds.decision),
+so it can be
 explained by what would have to change for the decision to change (counterfactual explanations, Wachter et al. 2018,
 Harvard Journal of Law & Technology):
   SPRAY      the fewest patches of the cell's fixed 20 x 20 px grid (5 cm x 5 cm) whose removal ends SPRAY, and gives
@@ -8,13 +9,14 @@ Harvard Journal of Law & Technology):
   DEFER      the predicted weed area to add for SPRAY, and the patches / area to remove for NO_SPRAY;
   NO_SPRAY   the predicted weed area to add for SPRAY.
 Only patches inside the cell are removed (the model also sees context outside it). Removal takes the patches with the
-most predicted weed first and assumes, without running the model again, that a removed patch becomes weed-free and
-the rest of the cell is unchanged: s drops by the patch's P(weed) mass / cell^2. The decision is monotone in s, so
-under that assumption largest-first gives the fewest patches. The deletion test of src.weeds.explain removes the same
-patches (its 'predicted_weed' ranking) and rescores the image with the model, which measures how far the estimate is
-off (compare_with_deletion), at its fixed removal sizes only. Adding weed follows from the rule alone and cannot be
-checked with the model.
-Areas are areas of predicted weed: P(weed) summed over pixels, times the pixel area.
+most weed pixels first (ties: the larger P(weed) mass first) and assumes, without running the model again, that a
+removed patch becomes weed-free and the rest of the cell is unchanged: s drops by the patch's weed pixels / cell^2.
+The decision is monotone in s, so under that assumption largest-first gives the fewest patches. The deletion test of
+src.weeds.explain removes the same patches (its 'predicted_weed' ranking) and rescores the image with the model, which
+measures how far the estimate is off (compare_with_deletion), at its fixed removal sizes only. Adding weed follows
+from the rule alone and cannot be checked with the model.
+Areas are areas of predicted weed: weed pixels times the pixel area. The functions take any map whose sum over a cell
+is cell^2 times its score (the 0/1 weed-pixel maps here; until 15/11/2026 the P(weed) maps).
 
   python -m src.weeds.counterfactual --probs <probs_test.npz> --decisions <decisions.csv> --out <dir>
                                      [--deletion <xai_deletion.csv>]
@@ -29,7 +31,7 @@ import numpy as np
 import pandas as pd
 
 from src.weeds.analyze import PRIMARY
-from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, decide_conformal
+from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, decide_conformal, predicted_weed
 
 GSD_CM = 0.25  # ground sampling distance of WeedsGalore: 2.5 mm per pixel (DJI P4 Multispectral at 5 m)
 PATCH = 20  # 20 px = 5 cm, the patch of the deletion test in src.weeds.explain
@@ -37,15 +39,20 @@ SCORE_TOL = 1e-5  # the decisions table and the probability map may come from tw
 SPRAYNESS = {NO_SPRAY: 0, DEFER: 1, SPRAY: 2}
 
 
-def ranked_patches(p_cell, patch):
-    """Patches of one cell's P(weed) map (cell, cell) ranked by their P(weed) mass, largest first: their indices in
-    row-major order of the cell's patch grid, and their masses (float64)."""
-    c = p_cell.shape[0]
-    if p_cell.shape != (c, c) or c % patch:
-        raise ValueError(f'the cell map must be square with a side divisible by the patch ({patch} px): {p_cell.shape}')
+def ranked_patches(w_cell, patch, tie=None):
+    """Patches of one cell's map (cell, cell) ranked by their mass (the weed pixels of a 0/1 weed map), largest first,
+    ties broken by the larger mass in the map `tie` (P(weed)) when given: their indices in row-major order of the
+    cell's patch grid, and their masses (float64)."""
+    c = w_cell.shape[0]
+    if w_cell.shape != (c, c) or c % patch:
+        raise ValueError(f'the cell map must be square with a side divisible by the patch ({patch} px): {w_cell.shape}')
     k = c // patch
-    m = p_cell.astype(np.float64).reshape(k, patch, k, patch).sum((1, 3)).ravel()
-    order = np.argsort(-m, kind='stable')
+    m = np.asarray(w_cell, dtype=np.float64).reshape(k, patch, k, patch).sum((1, 3)).ravel()
+    if tie is None:
+        order = np.argsort(-m, kind='stable')
+    else:
+        t = np.asarray(tie, dtype=np.float64).reshape(k, patch, k, patch).sum((1, 3)).ravel()
+        order = np.lexsort((-t, -m))  # by mass, then by the tie-break mass, then by index
     return order, m[order]
 
 
@@ -76,9 +83,11 @@ def _check_inputs(ids, p_weed, decisions, cell, patch):
         raise ValueError(f'no probability map for tiles {sorted(missing)}')
 
 
-def counterfactual_table(ids, p_weed, decisions, cell, patch=PATCH, gsd_cm=GSD_CM, score_tol=SCORE_TOL):
+def counterfactual_table(ids, p_weed, decisions, cell, patch=PATCH, gsd_cm=GSD_CM, score_tol=SCORE_TOL, tie=None):
     """One row per cell of the decision table (columns tile, date, s, lam_lo, lam_hi, decision, and cell, the cell's
-    row-major index in its tile; when absent, the row order within each tile). p_weed: (n, H, W) maps of the tiles ids.
+    row-major index in its tile; when absent, the row order within each tile). p_weed: (n, H, W) maps of the tiles ids
+    whose sum over a cell is cell^2 times its score (the 0/1 weed-pixel maps); tie: maps that break ties in the patch
+    ranking (P(weed)), or None.
     Areas in cm^2 of predicted weed; k_* in patches (NaN when no removal reaches the decision); `patches` lists the
     ranked patches (row-major indices in the tile's patch grid) up to the larger finite k, so that the first k_not_spray
     of them end SPRAY. Increases are infima: where the rule's inequality is strict, an arbitrarily small extra is
@@ -94,7 +103,8 @@ def counterfactual_table(ids, p_weed, decisions, cell, patch=PATCH, gsd_cm=GSD_C
     rows = []
     for _, d in t.iterrows():
         r, c, p_cell = _cell_map(p_weed, row_of[d['tile']], cell, d['cell'])
-        order, masses = ranked_patches(p_cell, patch)
+        tie_cell = None if tie is None else _cell_map(tie, row_of[d['tile']], cell, d['cell'])[2]
+        order, masses = ranked_patches(p_cell, patch, tie_cell)
         s = masses.sum() / cell ** 2
         if abs(s - d['s']) > score_tol:
             raise ValueError(f'{d["tile"]} cell {d["cell"]}: score {s:.6f} from the map, {d["s"]:.6f} in the table')
@@ -121,10 +131,10 @@ def counterfactual_table(ids, p_weed, decisions, cell, patch=PATCH, gsd_cm=GSD_C
     return pd.DataFrame(rows)
 
 
-def compare_with_deletion(table, ids, p_weed, deletion, cell, patch=PATCH, gsd_cm=GSD_CM):
+def compare_with_deletion(table, ids, p_weed, deletion, cell, patch=PATCH, gsd_cm=GSD_CM, tie=None):
     """The estimated score after removing the top-n patches next to the model's rescoring in the deletion test of
     src.weeds.explain, whose 'predicted_weed' ranking removes the same patches (n = ceil(fraction x patches per
-    tile)). One row per tested cell and fraction."""
+    tile)). One row per tested cell and fraction. p_weed and tie: as in counterfactual_table."""
     ids = list(ids)
     row_of = {tile: i for i, tile in enumerate(ids)}
     grid = (p_weed.shape[1] // patch, p_weed.shape[2] // patch)
@@ -136,7 +146,8 @@ def compare_with_deletion(table, ids, p_weed, deletion, cell, patch=PATCH, gsd_c
         c = t.loc[key]
         if key not in paths:
             _, _, p_cell = _cell_map(p_weed, row_of[key[0]], cell, key[1])
-            masses = ranked_patches(p_cell, patch)[1]
+            tie_cell = None if tie is None else _cell_map(tie, row_of[key[0]], cell, key[1])[2]
+            masses = ranked_patches(p_cell, patch, tie_cell)[1]
             paths[key] = removal_path(masses.sum() / cell ** 2, masses, cell)
         path = paths[key]
         n = int(math.ceil(d['fraction'] * grid[0] * grid[1]))  # the same float expression as explain.deletion_tile
@@ -205,7 +216,8 @@ def summarize_comparison(cmp):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--probs', required=True, help='probs_test.npz of the model that made the decisions')
+    ap.add_argument('--probs', required=True, help='probs_test.npz (P(crop), P(weed)) of the model that made the '
+                                                   'decisions')
     ap.add_argument('--decisions', required=True, help='decisions.csv (src.weeds.explain) of the same model')
     ap.add_argument('--deletion', help='xai_deletion.csv of the same model, to check the estimate against the model')
     ap.add_argument('--out', required=True)
@@ -213,21 +225,22 @@ def main():
     ap.add_argument('--patch', type=int, default=PATCH)
     args = ap.parse_args()
     with np.load(args.probs, allow_pickle=False) as z:
-        ids, p_weed = list(z['ids']), z['p_weed']
+        ids, p_crop, p_weed = list(z['ids']), z['p_crop'], z['p_weed']
     decisions = pd.read_csv(args.decisions)
     t0 = time.perf_counter()
-    table = counterfactual_table(ids, p_weed, decisions, args.cell, args.patch)
+    weed = predicted_weed(p_crop, p_weed)  # the pixels behind the decision score
+    table = counterfactual_table(ids, weed, decisions, args.cell, args.patch, tie=p_weed)
     seconds = time.perf_counter() - t0
     summary = {'inputs': {'probs': args.probs, 'decisions': args.decisions, 'deletion': args.deletion,
                           'cell_px': args.cell, 'patch_px': args.patch, 'gsd_cm': GSD_CM},
                **summarize(table)}
     if args.deletion:
         summary['check_against_model'] = summarize_comparison(
-            compare_with_deletion(table, ids, p_weed, pd.read_csv(args.deletion), args.cell, args.patch))
+            compare_with_deletion(table, ids, weed, pd.read_csv(args.deletion), args.cell, args.patch, tie=p_weed))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    table.to_csv(out / 'counterfactual_cells.csv', index=False)
-    (out / 'counterfactual_summary.json').write_text(json.dumps(summary, indent=1))
+    table.to_csv(out / 'counterfactual_cells.csv', index=False, lineterminator='\n')  # LF on every OS, as in the repo
+    (out / 'counterfactual_summary.json').write_bytes(json.dumps(summary, indent=1).encode())
     print(json.dumps(summary, indent=1))
     print(f'{len(table)} cells in {seconds:.2f} s ({1000 * seconds / len(table):.2f} ms per cell, this machine)')
 

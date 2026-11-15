@@ -5,7 +5,8 @@
 The validation split already chose the model (best epoch, early stopping), so it is not independent of the model.
 Primary calibration is therefore 2-fold on the test split by field location: thresholds from 4 locations decide the
 other 4, and vice versa. Calibration on the validation split is reported as a secondary variant.
-The weed-cover thresholds tau are illustrative until replaced by sourced action thresholds.
+The primary weed-cover threshold (tau = 0.1 %) lies in the range of economic weed-cover thresholds found by Longchamps
+et al. (2014); every tau of TAUS is reported, as a sensitivity analysis.
 """
 import argparse
 import json
@@ -17,30 +18,40 @@ import pandas as pd
 
 from src.weeds.data import (DATES, EXPECTED_TEST_LOCATIONS, PAPER_TEST_3CLASS_MSI, PRE_HERBICIDE_DATES,
                             load_npz, location_blocks, to_3class)
-from src.weeds.decision import cell_table, crossfit_decisions, evaluate_crossfit, evaluate_policies
+from src.weeds.decision import ANY_WEED, cell_table, crossfit_decisions, evaluate_crossfit, evaluate_policies
 
 CELL_SIZES = (100, 200)                # 0.25 m and 0.5 m cells at 2.5 mm GSD
-TAUS = (0.001, 0.005, 0.01, 0.02)      # illustrative weed-cover fractions that make a cell need spraying
+# Weed-cover fractions that make a cell need spraying (sensitivity analysis). ANY_WEED: spray any weed, the zero
+# threshold of maize spot-spraying trials (Allmendinger et al. 2024, Plants 13:2164); 0.0006 and 0.0031: the range of
+# economic weed-cover thresholds that crop advisers set on images (Longchamps et al. 2014, Weed Sci 62:177-185);
+# 0.005-0.02: less strict thresholds, for comparison (0.01 was the illustrative primary value until 14/11/2026).
+TAUS = (ANY_WEED, 0.0006, 0.001, 0.0031, 0.005, 0.01, 0.02)
 ALPHA = BETA = 0.1
 SCOPES = {'pre-herbicide pooled': PRE_HERBICIDE_DATES, **{d: (d,) for d in DATES}}  # name -> acquisition dates
 CAL_TEST_2FOLD = 'test 2-fold by location'
 CAL_VAL = 'val (also used for model selection)'
-PRIMARY = {'cell_size': 200, 'tau': 0.01, 'policy': 'conformal_3way', 'scope': 'pre-herbicide pooled',
-           'calibration': CAL_TEST_2FOLD}
+# primary tau 0.1 %: inside the range of Longchamps et al. (2014), chosen by the user on 14/11/2026. score: the cell
+# score of decision.cell_table, the share of pixels predicted as weed ('argmax', from 15/11/2026; before: the mean
+# P(weed)). It is written into decision_metrics.csv, so that results of the two scores are never mixed.
+SCORE = 'argmax'
+PRIMARY = {'cell_size': 200, 'tau': 0.001, 'policy': 'conformal_3way', 'scope': 'pre-herbicide pooled',
+           'calibration': CAL_TEST_2FOLD, 'score': SCORE}
 # Proposed pilot criteria (agreed before running; adjustable). C1: test mIoU at most 5 points below the paper's value
 # for the same input; segmentation_metrics.json of the authors' checkpoints carries it as 'paper_test', our own runs
-# (5-band input) are compared with Table 3's MSI value.
-CRITERIA = {'miou_below_paper_max': 5.0, 'spray_reduction_min': 0.30, 'deferred_max': 0.30}
+# (5-band input) are compared with Table 3's MSI value. C2: the spray reduction reaches 60 % of the largest one
+# possible at this tau (the oracle's). Until 14/11/2026 C2 was a fixed 30 %, set for tau = 1 % where the oracle reaches
+# 50 %: the same criterion there, but at the primary tau of 0.1 % even the oracle (10 %) could not meet it.
+CRITERIA = {'miou_below_paper_max': 5.0, 'spray_reduction_vs_oracle_min': 0.6, 'deferred_max': 0.30}
 
 
 def load_cells(data_dir, out_dir, split, cell):
     d = load_npz(Path(data_dir) / f'weedsgalore_{split}.npz')
     with np.load(Path(out_dir) / f'probs_{split}.npz') as p:
-        ids, p_weed = p['ids'].astype(str), p['p_weed']
+        ids, p_crop, p_weed = p['ids'].astype(str), p['p_crop'], p['p_weed']
     n = len(ids)
     if not np.array_equal(ids, d['ids'][:n]):
         raise ValueError(f'{split}: probabilities and labels are not in the same tile order')
-    return cell_table(ids, to_3class(d['y'][:n]), p_weed, cell)
+    return cell_table(ids, to_3class(d['y'][:n]), p_crop, p_weed, cell)
 
 
 def test_location_folds(test_ids):
@@ -76,7 +87,7 @@ def run(data_dir, out_dir):
                 t = test_all[test_all['date'].isin(dates)]
                 if t.empty:
                     continue
-                base = {'cell_size': cell, 'scope': scope}
+                base = {'score': SCORE, 'cell_size': cell, 'scope': scope}
                 rows += [{**base, 'calibration': CAL_TEST_2FOLD, **r}
                          for r in evaluate_crossfit(t, t['tile'].map(fold_of).to_numpy(), tau, ALPHA, BETA)]
                 v = val_all[val_all['date'].isin(dates)]
@@ -94,16 +105,27 @@ def pick(df, **keys):
     return df[m].iloc[0]
 
 
+def per_fold(v):
+    """lam_lo / lam_hi of a decision_metrics row as a list (one value per fold): a tuple in the frame run() returns,
+    its text, e.g. '(0.0023, inf)', in a frame read back from decision_metrics.csv."""
+    if isinstance(v, str):
+        return [float(x) for x in v.strip('()[] ').split(',') if x.strip()]
+    return list(v) if isinstance(v, (tuple, list)) else [v]
+
+
 def go_no_go(df, seg):
+    if df.get('score', pd.Series(['mean P(weed)'])).iloc[0] != SCORE:  # a file of the former score has no column
+        raise ValueError(f'decision metrics computed with another cell score than {SCORE!r}: rerun run() first')
     key = {k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')}
     r = pick(df, policy=PRIMARY['policy'], **key)
     oracle = pick(df, policy='oracle', **key)
     miou = seg['test']['miou']
     miou_min = seg.get('paper_test', PAPER_TEST_3CLASS_MSI)['miou'] - CRITERIA['miou_below_paper_max']
+    c2_min = CRITERIA['spray_reduction_vs_oracle_min'] * oracle['spray_reduction']  # 0.3 at tau = 1 %, as before
     checks = {
         'C1_test_miou': {'value': miou, 'required': f'>= {miou_min:.2f}', 'pass': bool(miou >= miou_min)},
-        'C2_spray_reduction': {'value': r['spray_reduction'], 'required': f">= {CRITERIA['spray_reduction_min']}",
-                               'pass': bool(r['spray_reduction'] >= CRITERIA['spray_reduction_min'])},
+        'C2_spray_reduction': {'value': r['spray_reduction'], 'required': f'>= {c2_min:.4g}',
+                               'pass': bool(r['spray_reduction'] >= c2_min)},
         'C3_deferred': {'value': r['deferred'], 'required': f"<= {CRITERIA['deferred_max']}",
                         'pass': bool(r['deferred'] <= CRITERIA['deferred_max'])},
     }
@@ -111,9 +133,9 @@ def go_no_go(df, seg):
         'primary_setting': PRIMARY, 'alpha': ALPHA, 'beta': BETA,
         'missed_need_rate': r['missed_need_rate'], 'false_spray_rate': r['false_spray_rate'],
         'infestation': r['infestation'], 'oracle_spray_reduction': oracle['spray_reduction'],
-        'c2_reachable': bool(oracle['spray_reduction'] >= CRITERIA['spray_reduction_min']),
+        'c2_share_of_oracle_min': CRITERIA['spray_reduction_vs_oracle_min'],
         'n_cal_need': int(r['n_cal_need']), 'n_cal_no_need': int(r['n_cal_no_need']),
-        'lam_lo': r['lam_lo'], 'lam_hi': r['lam_hi'],
+        'lam_lo': per_fold(r['lam_lo']), 'lam_hi': per_fold(r['lam_hi']),  # numbers: the XAI notebook checks them
     }
     return {'verdict': 'GO' if all(c['pass'] for c in checks.values()) else 'NO-GO', 'checks': checks, 'info': info}
 
@@ -133,17 +155,24 @@ def clean(o):
     return o
 
 
+def write_results(data_dir, out_dir):
+    """decision_metrics.csv and go_no_go.json of the model whose probs_*.npz and segmentation_metrics.json are in
+    out_dir (LF line ends on every OS, as in the repo). Returns the metrics and the verdict."""
+    out = Path(out_dir)
+    df = run(data_dir, out)
+    df.to_csv(out / 'decision_metrics.csv', index=False, lineterminator='\n')
+    seg = json.loads((out / 'segmentation_metrics.json').read_text())
+    verdict = go_no_go(df, seg)
+    (out / 'go_no_go.json').write_bytes(json.dumps(clean(verdict), indent=1).encode())
+    return df, verdict
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', required=True)
     ap.add_argument('--out', required=True)
     args = ap.parse_args()
-    out = Path(args.out)
-    df = run(args.data, out)
-    df.to_csv(out / 'decision_metrics.csv', index=False)
-    seg = json.loads((out / 'segmentation_metrics.json').read_text())
-    verdict = go_no_go(df, seg)
-    (out / 'go_no_go.json').write_text(json.dumps(clean(verdict), indent=1))
+    df, verdict = write_results(args.data, args.out)
 
     cols = ['policy', 'infestation', 'sprayed', 'deferred', 'spray_reduction', 'missed_need_rate', 'false_spray_rate',
             'missed_weed_area', 'crop_area_sprayed']
@@ -164,8 +193,8 @@ def main():
     i = verdict['info']
     print(f"  validity: missed-need rate {i['missed_need_rate']:.3f} vs alpha {ALPHA}, "
           f"false-spray rate {i['false_spray_rate']:.3f} vs beta {BETA}")
-    if not i['c2_reachable']:
-        print(f"  note: C2 cannot be met at this tau even by the oracle (oracle reduction {i['oracle_spray_reduction']:.3f})")
+    print(f"  C2 requires {i['c2_share_of_oracle_min']:.0%} of the oracle's spray reduction "
+          f"({i['oracle_spray_reduction']:.3f} at this tau)")
 
 
 if __name__ == '__main__':

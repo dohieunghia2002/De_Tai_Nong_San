@@ -7,9 +7,24 @@ import pytest
 
 from src.weeds.analyze import PRIMARY, go_no_go
 from src.weeds.data import location_blocks
-from src.weeds.decision import (DEFER, NO_SPRAY, SPRAY, cell_table, crossfit_decisions, decide_conformal,
+from src.weeds.decision import (ANY_WEED, DEFER, NO_SPRAY, SPRAY, cell_table, crossfit_decisions, decide_conformal,
                                 decide_threshold, decision_metrics, evaluate_crossfit, evaluate_policies,
-                                lower_threshold, upper_threshold)
+                                lower_threshold, needs_spray, predicted_weed, upper_threshold)
+
+
+def test_needs_spray_any_weed_and_thresholds():
+    w = np.array([0.0, 1 / 40000, 0.001, 0.0031, 0.02])  # no weed, one weed pixel of a 200 px cell, ...
+    assert needs_spray(w, ANY_WEED).tolist() == [False, True, True, True, True]  # w >= 0 would count the empty cell
+    assert needs_spray(w, 0.001).tolist() == [False, False, True, True, True]
+    assert needs_spray(w, 0.0031).tolist() == [False, False, False, True, True]
+    # an exact cover of 124 / 40000 pixels, computed as cell_table does, reaches tau = 0.0031
+    y = np.zeros((1, 200, 200), np.uint8)
+    y.reshape(-1)[:124] = 2
+    t = cell_table(np.array(['2023-05-30_0001']), y, np.zeros(y.shape, np.float32), np.zeros(y.shape, np.float32), 200)
+    assert needs_spray(t['w'], 0.0031).tolist() == [True]
+    rows = evaluate_policies(pd.DataFrame({'w': [0.0, 0.01], 's': [0.0, 0.01]}),
+                             pd.DataFrame({'w': [0.0, 0.01], 's': [0.0, 0.01], 'crop': [0.0, 0.0]}), ANY_WEED, 0.1, 0.1)
+    assert {r['policy']: r['infestation'] for r in rows}['oracle'] == 0.5  # the empty cell does not need spraying
 
 
 def test_cell_table_fractions():
@@ -19,11 +34,12 @@ def test_cell_table_fractions():
                    [1, 1, 2, 0],
                    [0, 0, 0, 0]]], dtype=np.uint8)
     p = np.zeros_like(y, dtype=np.float32)
-    p[0, 0, 0] = 0.8
-    t = cell_table(np.array(['2023-05-30_0001']), y, p, 2)
+    p[0, 0, 0] = 0.8   # weed is the most probable class of this pixel only (background 0.2)
+    p[0, 0, 1] = 0.3   # background (0.7) stays the most probable class
+    t = cell_table(np.array(['2023-05-30_0001']), y, np.zeros_like(p), p, 2)
     assert list(t['w']) == [0.75, 0.0, 0.0, 0.25]       # cells in row-major order
     assert list(t['crop']) == [0.25, 0.0, 0.5, 0.0]
-    assert t['s'].tolist() == pytest.approx([0.2, 0.0, 0.0, 0.0])
+    assert t['s'].tolist() == [0.25, 0.0, 0.0, 0.0]     # one of the 4 pixels of cell 0 is predicted weed
     assert set(t['date']) == {'2023-05-30'}
 
 
@@ -31,16 +47,32 @@ def test_score_at_exact_threshold_is_not_rounded_down():
     # a 200 x 200 cell with exactly 400 weed pixels (1 %) and perfect float16 probabilities must reach tau = 0.01
     y = np.zeros((1, 200, 200), dtype=np.uint8)
     y.reshape(-1)[:400] = 2
-    t = cell_table(np.array(['2023-05-30_0001']), y, (y == 2).astype(np.float16), 200)
-    assert t['w'].iloc[0] == 0.01
+    p = (y == 2).astype(np.float16)
+    t = cell_table(np.array(['2023-05-30_0001']), y, np.zeros_like(p), p, 200)
+    assert t['w'].iloc[0] == 0.01 and t['s'].iloc[0] == 0.01
     assert decide_threshold(t['s'], 0.01)[0] == SPRAY
 
 
 def test_cell_table_rejects_bad_shapes():
     with pytest.raises(ValueError):
-        cell_table(np.array(['a']), np.zeros((1, 6, 6), np.uint8), np.zeros((1, 6, 6)), 4)
+        cell_table(np.array(['a']), np.zeros((1, 6, 6), np.uint8), np.zeros((1, 6, 6)), np.zeros((1, 6, 6)), 4)
     with pytest.raises(ValueError):
-        cell_table(np.array(['a', 'b']), np.zeros((1, 4, 4), np.uint8), np.zeros((1, 4, 4)), 2)
+        cell_table(np.array(['a', 'b']), np.zeros((1, 4, 4), np.uint8), np.zeros((1, 4, 4)), np.zeros((1, 4, 4)), 2)
+    with pytest.raises(ValueError):  # P(crop) and P(weed) maps of different shapes
+        cell_table(np.array(['a']), np.zeros((1, 4, 4), np.uint8), np.zeros((1, 4, 2)), np.zeros((1, 4, 4)), 2)
+
+
+def test_predicted_weed_is_the_argmax_of_the_stored_probabilities():
+    # argmax over (background = 1 - crop - weed, crop, weed), ties to the earlier class, after float16 rounding
+    pc = np.array([0.0, 0.5, 0.40, 0.2, 0.3, 0.1], np.float32)
+    pw = np.array([0.8, 0.5, 0.45, 0.5, 0.4, 0.3], np.float32)
+    assert predicted_weed(pc, pw).tolist() == [True, False, True, True, True, False]
+    rng = np.random.default_rng(0)
+    p = rng.dirichlet([1, 1, 1], size=10000).astype(np.float16)  # background, crop, weed as train.evaluate keeps them
+    pc, pw = p[:, 1], p[:, 2]
+    a, b = pc.astype(np.float32), pw.astype(np.float32)
+    assert (predicted_weed(pc, pw) == (np.stack([1 - a - b, a, b]).argmax(0) == 2)).all()
+    assert (predicted_weed(pc.astype(np.float32), pw) == predicted_weed(pc, pw)).all()  # float32 input rounded
 
 
 def test_lower_threshold_ranks():
@@ -154,7 +186,7 @@ def test_crossfit_decisions_are_aligned_with_rows():
 
 
 def test_go_no_go_compares_miou_with_the_paper_value_for_the_same_input():
-    key = {k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')}
+    key = {k: PRIMARY[k] for k in ('score', 'cell_size', 'tau', 'scope', 'calibration')}
     df = pd.DataFrame([{**key, 'policy': p, 'spray_reduction': 0.5, 'deferred': 0.1, 'missed_need_rate': 0.0,
                         'false_spray_rate': 0.0, 'infestation': 0.5, 'n_cal_need': 10, 'n_cal_no_need': 10,
                         'lam_lo': (0.01,), 'lam_hi': (0.02,)} for p in (PRIMARY['policy'], 'oracle')])
@@ -162,6 +194,51 @@ def test_go_no_go_compares_miou_with_the_paper_value_for_the_same_input():
     assert ours['required'] == '>= 77.90' and not ours['pass']
     rgb = go_no_go(df, {'test': {'miou': 76.0}, 'paper_test': {'miou': 79.33}})['checks']['C1_test_miou']
     assert rgb['required'] == '>= 74.33' and rgb['pass']
+
+
+def test_go_no_go_reads_the_thresholds_back_from_csv(tmp_path):
+    # decision_metrics.csv stores the per-fold thresholds as text: go_no_go must still write numbers (the XAI notebook
+    # subtracts them), also for an infinite threshold (too few calibration cells)
+    key = {k: PRIMARY[k] for k in ('score', 'cell_size', 'tau', 'scope', 'calibration')}
+    df = pd.DataFrame([{**key, 'policy': p, 'spray_reduction': 0.5, 'deferred': 0.1, 'missed_need_rate': 0.0,
+                        'false_spray_rate': 0.0, 'infestation': 0.5, 'n_cal_need': 10, 'n_cal_no_need': 10,
+                        'lam_lo': (0.0023526254758238, 0.0014994372025132), 'lam_hi': (0.002, math.inf)}
+                       for p in (PRIMARY['policy'], 'oracle')])
+    df.to_csv(tmp_path / 'decision_metrics.csv', index=False)
+    back = pd.read_csv(tmp_path / 'decision_metrics.csv')
+    assert isinstance(back['lam_lo'].iloc[0], str)  # what made the notebook fail on 14/11/2026
+    seg = {'test': {'miou': 80.0}}
+    for frame in (df, back):
+        info = go_no_go(frame, seg)['info']
+        assert info['lam_lo'] == [0.0023526254758238, 0.0014994372025132] and info['lam_hi'] == [0.002, math.inf]
+
+
+def test_go_no_go_refuses_metrics_of_the_former_score():
+    # decision_metrics.csv written before 15/11/2026 has no 'score' column: its s was the mean P(weed)
+    key = {k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')}
+    df = pd.DataFrame([{**key, 'policy': p, 'spray_reduction': 0.5, 'deferred': 0.1, 'missed_need_rate': 0.0,
+                        'false_spray_rate': 0.0, 'infestation': 0.5, 'n_cal_need': 10, 'n_cal_no_need': 10,
+                        'lam_lo': (0.01,), 'lam_hi': (0.02,)} for p in (PRIMARY['policy'], 'oracle')])
+    with pytest.raises(ValueError, match='cell score'):
+        go_no_go(df, {'test': {'miou': 80.0}})
+
+
+def test_go_no_go_c2_is_a_share_of_the_oracle_reduction():
+    key = {k: PRIMARY[k] for k in ('score', 'cell_size', 'tau', 'scope', 'calibration')}
+
+    def c2(ours, oracle):
+        df = pd.DataFrame([{**key, 'policy': p, 'spray_reduction': v, 'deferred': 0.1, 'missed_need_rate': 0.0,
+                            'false_spray_rate': 0.0, 'infestation': 1 - oracle, 'n_cal_need': 10, 'n_cal_no_need': 10,
+                            'lam_lo': (0.01,), 'lam_hi': (0.02,)} for p, v in ((PRIMARY['policy'], ours),
+                                                                               ('oracle', oracle))])
+        return go_no_go(df, {'test': {'miou': 80.0}})['checks']['C2_spray_reduction']
+
+    # oracle 50 % (tau = 1 % on the test cells): exactly the former fixed criterion, 30 %
+    assert c2(0.30, 0.5) == {'value': 0.30, 'required': '>= 0.3', 'pass': True}
+    assert not c2(0.29, 0.5)['pass']
+    # oracle 10.2 % (tau = 0.1 %): 60 % of it
+    assert c2(0.157, 0.102)['required'] == '>= 0.0612' and c2(0.157, 0.102)['pass']
+    assert not c2(0.06, 0.102)['pass']
 
 
 def test_primary_decisions_match_the_crossfit_metrics():

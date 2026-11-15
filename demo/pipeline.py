@@ -25,7 +25,7 @@ from PIL import Image
 import core as C
 from src.weeds.authors import CKPT_ZIP_BYTES, CKPT_URL  # noqa: F401  (CKPT_URL: shown on the page)
 from src.weeds.counterfactual import counterfactual_table, ranked_patches, removal_path
-from src.weeds.decision import cell_table, decide_conformal, lower_threshold, upper_threshold
+from src.weeds.decision import cell_table, decide_conformal, lower_threshold, predicted_weed, upper_threshold
 
 MODEL_NAME = 'dlv3p_msi_3'
 CKPT_DIR = C.IMAGES / 'ckpts'           # data/ is not in git
@@ -193,10 +193,11 @@ def thresholds(tile_id, split, test_cells, fold_of, tau=TAU, alpha=C.ALPHA, beta
             'n_need': int(need.sum()), 'n_no_need': int((~need).sum()), 'locations': int(cal['tile'].nunique())}
 
 
-def decide_tile(p_weed, mask, tile_id, thr, cell=CELL, tau=TAU):
-    """One row per cell (row-major): score s, decision and, when the label is known, true weed cover and need."""
+def decide_tile(p_crop, p_weed, mask, tile_id, thr, cell=CELL, tau=TAU):
+    """One row per cell (row-major): score s (the share of weed pixels, from the model's P(crop) and P(weed) maps of
+    the tile), decision and, when the label is known, true weed cover and need."""
     y3 = C.to_3class(mask) if mask is not None else np.zeros(p_weed.shape, np.uint8)
-    t = cell_table([tile_id or 'upload'], y3[None], p_weed[None], cell)
+    t = cell_table([tile_id or 'upload'], y3[None], p_crop[None], p_weed[None], cell)
     t['cell'] = np.arange(len(t))
     t['lam_lo'], t['lam_hi'] = thr['lam_lo'], thr['lam_hi']
     t['decision'] = decide_conformal(t['s'].to_numpy(), thr['lam_lo'], thr['lam_hi'])
@@ -208,18 +209,21 @@ def decide_tile(p_weed, mask, tile_id, thr, cell=CELL, tau=TAU):
     return t
 
 
-def explain_estimate(p_weed, cells):
-    """The fast counterfactual of every cell (src.weeds.counterfactual, from the P(weed) map alone)."""
+def explain_estimate(p_crop, p_weed, cells):
+    """The fast counterfactual of every cell (src.weeds.counterfactual, from the model's maps alone): patches ranked by
+    weed pixels, ties by P(weed) mass."""
     tile = cells['tile'].iloc[0]
-    return counterfactual_table([tile], p_weed[None], cells[['tile', 'date', 's', 'lam_lo', 'lam_hi', 'decision',
-                                                            'cell']], CELL)
+    return counterfactual_table([tile], predicted_weed(p_crop, p_weed)[None],
+                                cells[['tile', 'date', 's', 'lam_lo', 'lam_hi', 'decision', 'cell']], CELL,
+                                tie=p_weed[None])
 
 
-def estimate_steps(p_weed, cell_idx, lam_lo, lam_hi, cell=CELL):
+def estimate_steps(p_crop, p_weed, cell_idx, lam_lo, lam_hi, cell=CELL):
     """Estimated score and decision after removing 0, 1, 2, ... ranked patches of one cell (no model run), in the
     columns of results/weeds_cfcheck/cfcheck_steps.csv so the figure code draws it."""
     r, c = divmod(int(cell_idx), p_weed.shape[1] // cell)
-    _, masses = ranked_patches(p_weed[r * cell:(r + 1) * cell, c * cell:(c + 1) * cell], C.PATCH)
+    sl = (slice(r * cell, (r + 1) * cell), slice(c * cell, (c + 1) * cell))
+    _, masses = ranked_patches(predicted_weed(p_crop[sl], p_weed[sl]), C.PATCH, p_weed[sl])
     est = removal_path(masses.sum() / cell ** 2, masses, cell)
     dec = decide_conformal(est, lam_lo, lam_hi)
     return pd.DataFrame({'k': np.arange(len(est)), 's_model': est, 's_estimate': est, 'decision_model': dec,

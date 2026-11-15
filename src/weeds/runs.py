@@ -51,8 +51,11 @@ def schedule(done):
 
 
 def decision_row(csv):
-    r = pick(pd.read_csv(csv), policy=PRIMARY['policy'],
-             **{k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')})
+    df = pd.read_csv(csv)
+    if df.get('score', pd.Series(['mean P(weed)'])).iloc[0] != PRIMARY['score']:  # the former score has no column
+        raise ValueError(f'{csv} was computed with another cell score than {PRIMARY["score"]!r}: rerun '
+                         'src.weeds.analyze for that run')
+    r = pick(df, policy=PRIMARY['policy'], **{k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')})
     return {k: r[k] for k in ('spray_reduction', 'deferred', 'missed_need_rate', 'false_spray_rate')}
 
 

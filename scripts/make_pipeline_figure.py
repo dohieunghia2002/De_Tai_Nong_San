@@ -20,7 +20,7 @@ sys.path[:0] = [str(ROOT_DIR), str(ROOT_DIR / 'scripts')]
 from export_weeds_images import B, G, R, band_limits, composite, date_vi, font  # noqa: E402
 from src.weeds.analyze import ALPHA, BETA, PRIMARY, primary_decisions, test_location_folds  # noqa: E402
 from src.weeds.data import BANDS, SPLITS, TILE, load_split, split_ids, to_3class  # noqa: E402
-from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, cell_table, decision_metrics  # noqa: E402
+from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, cell_table, decision_metrics, needs_spray  # noqa: E402
 
 GSD_M = 0.0025  # ground size of one pixel: 2.5 mm (Celikkan et al. 2025)
 SEG = [('nền đất', (45, 45, 45)), ('ngô', (60, 200, 60)), ('cỏ dại', (235, 50, 50))]
@@ -55,11 +55,11 @@ def decisions(zip_path, run):
         if list(p['ids'].astype(str)) != list(test['ids']):
             raise ValueError('probabilities and labels are not in the same tile order')
         p_crop, p_weed = p['p_crop'].astype(np.float32), p['p_weed'].astype(np.float32)
-    cells = cell_table(test['ids'], to_3class(test['y']), p_weed, PRIMARY['cell_size'])
+    cells = cell_table(test['ids'], to_3class(test['y']), p_crop, p_weed, PRIMARY['cell_size'])
     t = primary_decisions(cells, test_location_folds(list(test['ids'])))
 
     # the figure must show the same decisions as the reported results
-    m = decision_metrics(t['decision'].to_numpy(), t['w'].to_numpy() >= PRIMARY['tau'], t['w'].to_numpy(),
+    m = decision_metrics(t['decision'].to_numpy(), needs_spray(t['w'], PRIMARY['tau']), t['w'].to_numpy(),
                          t['crop'].to_numpy())
     rep = json.loads((run / 'go_no_go.json').read_text())
     reported = {'spray_reduction': rep['checks']['C2_spray_reduction']['value'],

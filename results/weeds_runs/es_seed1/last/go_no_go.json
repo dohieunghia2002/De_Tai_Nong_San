@@ -7,12 +7,12 @@
    "pass": false
   },
   "C2_spray_reduction": {
-   "value": 0.5046296296296297,
-   "required": ">= 0.3",
+   "value": 0.1620370370370371,
+   "required": ">= 0.06111",
    "pass": true
   },
   "C3_deferred": {
-   "value": 0.0,
+   "value": 0.06944444444444445,
    "required": "<= 0.3",
    "pass": true
   }
@@ -20,27 +20,28 @@
  "info": {
   "primary_setting": {
    "cell_size": 200,
-   "tau": 0.01,
+   "tau": 0.001,
    "policy": "conformal_3way",
    "scope": "pre-herbicide pooled",
-   "calibration": "test 2-fold by location"
+   "calibration": "test 2-fold by location",
+   "score": "argmax"
   },
   "alpha": 0.1,
   "beta": 0.1,
-  "missed_need_rate": 0.08333333333333333,
-  "false_spray_rate": 0.07407407407407407,
-  "infestation": 0.5,
-  "oracle_spray_reduction": 0.5,
-  "c2_reachable": true,
-  "n_cal_need": 54,
-  "n_cal_no_need": 54,
+  "missed_need_rate": 0.07731958762886598,
+  "false_spray_rate": 0.09090909090909091,
+  "infestation": 0.8981481481481481,
+  "oracle_spray_reduction": 0.10185185185185186,
+  "c2_share_of_oracle_min": 0.6,
+  "n_cal_need": 95,
+  "n_cal_no_need": 9,
   "lam_lo": [
-   0.005691389374434948,
-   0.005273697406053543
+   0.0,
+   0.000325
   ],
   "lam_hi": [
-   0.005703136704862118,
-   0.0053309025943279265
+   0.00015,
+   0.00025
   ]
  }
 }

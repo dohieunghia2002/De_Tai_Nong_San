@@ -7,7 +7,7 @@ import pytest
 torch = pytest.importorskip('torch')
 
 from src.weeds import explain as E  # noqa: E402
-from src.weeds.decision import DEFER, NO_SPRAY, SPRAY  # noqa: E402
+from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, cell_table  # noqa: E402
 from src.weeds.model import DeepLabV3Plus  # noqa: E402
 
 CELL, PATCH, SIZE = 32, 8, 64
@@ -37,13 +37,22 @@ def test_features_and_head_are_the_forward_pass(model, tile):
         assert torch.equal(model.head(model.features(tile[None]), tile.shape[-2:]), model(tile[None]))
 
 
-def test_cell_scores_are_mean_weed_probabilities(model, tile):
+def test_cell_scores_are_shares_of_weed_pixels(model, tile):
+    """s counts the pixels whose most probable class is weed, to the bit as decision.cell_table does on the stored
+    (float16) maps; the gradient methods explain the cell's mean P(weed) instead."""
     with torch.no_grad():
-        p = torch.softmax(model(tile[None]), 1)[0, 2]
+        probs = torch.softmax(model(tile[None]).float(), 1)[0]
         s = E.cell_scores(model, tile[None], CELL, amp=False)[0]
-    assert s.shape == (2, 2)
-    assert s[1, 0] == pytest.approx(float(p[CELL:, :CELL].mean()), rel=1e-5)
-    assert float(E.cell_sum(p, (1, 0), CELL)) == pytest.approx(float(s[1, 0]) * CELL * CELL, rel=1e-5)
+        p = E.cell_prob_scores(model, tile[None], CELL, amp=False)[0]
+    stored = probs[1:].half().numpy()  # P(crop), P(weed) as train.evaluate keeps them
+    t = cell_table(np.array(['2023-05-30_0001']), np.zeros((1, SIZE, SIZE), np.uint8), stored[0][None],
+                   stored[1][None], CELL)
+    assert s.shape == (2, 2) and s.dtype == torch.float64
+    assert s.flatten().tolist() == t['s'].tolist() and float(s.max()) > 0  # this tile has weed pixels in cell 3
+    assert p[1, 0] == pytest.approx(float(probs[2, CELL:, :CELL].mean()), rel=1e-5)
+    assert float(E.cell_sum(probs[2], (1, 0), CELL)) == pytest.approx(float(p[1, 0]) * CELL * CELL, rel=1e-5)
+    # a cell without a weed pixel scores 0, while its mean P(weed) is small but not 0: the floor the score removes
+    assert float(s[0, 0]) == 0 and float(p[0, 0]) > 0
 
 
 def test_integrated_gradients_completeness(model, tile):

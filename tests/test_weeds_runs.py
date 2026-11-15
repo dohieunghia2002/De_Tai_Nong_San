@@ -32,7 +32,7 @@ def write_model(d, seg_model, test_miou, deferred):
     d.mkdir(parents=True)
     (d / 'segmentation_metrics.json').write_text(json.dumps(
         {**seg_model, 'val': {'miou': 83.0}, 'test': {'miou': test_miou, 'crop': 70.0, 'weed': 75.0}}))
-    key = {k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')}
+    key = {k: PRIMARY[k] for k in ('score', 'cell_size', 'tau', 'scope', 'calibration')}
     pd.DataFrame([{**key, 'policy': p, 'spray_reduction': 0.5, 'deferred': deferred if p == PRIMARY['policy'] else 0.0,
                    'missed_need_rate': 0.01, 'false_spray_rate': 0.02} for p in (PRIMARY['policy'], 'plug_in')]
                  ).to_csv(d / 'decision_metrics.csv', index=False)
@@ -64,6 +64,14 @@ def test_summarize_and_by_schedule(tmp_path):
     assert s.loc[('100 epochs fixed', 8, 'best val'), 'std'] == pytest.approx(2 ** 0.5)
     assert s.loc[('100 epochs fixed', 8, 'last epoch'), 'mean'] == pytest.approx(82.0)
     assert s.loc[('early stopping (30)', 8, 'best val'), 'n'] == 1
+
+
+def test_decision_row_refuses_the_former_score(tmp_path):
+    key = {k: PRIMARY[k] for k in ('cell_size', 'tau', 'scope', 'calibration')}  # no 'score': written before 15/11
+    pd.DataFrame([{**key, 'policy': PRIMARY['policy'], 'spray_reduction': 0.5, 'deferred': 0.1, 'missed_need_rate': 0.0,
+                   'false_spray_rate': 0.0}]).to_csv(tmp_path / 'decision_metrics.csv', index=False)
+    with pytest.raises(ValueError, match='cell score'):
+        R.decision_row(tmp_path / 'decision_metrics.csv')
 
 
 def test_summary_of_nothing():

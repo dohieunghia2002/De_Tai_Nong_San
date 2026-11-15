@@ -1,8 +1,11 @@
 """Spraying decision layer on top of the segmentation output (numpy only, runs anywhere).
 
 Each 600x600 tile is split into square cells of `cell` pixels (200 px = 0.5 m at the 2.5 mm GSD of WeedsGalore).
-  truth  w     : labelled weed fraction of the cell; the cell needs spraying if w >= tau
-  score  s     : mean predicted P(weed) over the cell, i.e. the expected weed fraction
+  truth  w     : labelled weed fraction of the cell; the cell needs spraying if w >= tau (tau = 0: any weed, w > 0)
+  score  s     : predicted weed fraction of the cell: the share of its pixels whose most probable class is weed
+                 (predicted_weed), the weed cover of prescription maps made from segmentations. Until 15/11/2026 s was
+                 the mean P(weed); summed over a cell, the small P(weed) of every soil and crop pixel added about
+                 3 cm^2 of 'weed' to a cell of bare soil, as much as the thresholds at tau = 0.1 %.
 Decisions per cell: NO_SPRAY, SPRAY or DEFER (scout the cell; scouting is assumed to reveal the true need).
 
 Class-conditional split conformal thresholds, calibrated on held-out cells that played no part in training or model
@@ -19,6 +22,14 @@ import pandas as pd
 
 NO_SPRAY, SPRAY, DEFER = 0, 1, 2
 _EPS = 1e-9  # guards floor/ceil against floating-point error in alpha * (n + 1)
+ANY_WEED = 0.0  # tau meaning "spray any weed": a cell needs spraying as soon as one of its pixels is weed
+
+
+def needs_spray(w, tau):
+    """Ground truth of each cell: its labelled weed fraction w reaches tau. tau = ANY_WEED means any weed at all
+    (w > 0); w >= 0 would also count the cells without weed."""
+    w = np.asarray(w, dtype=float)
+    return w > 0 if tau == ANY_WEED else w >= tau
 
 
 def cell_view(a, cell):
@@ -28,15 +39,26 @@ def cell_view(a, cell):
     return a.reshape(n, h // cell, cell, w // cell, cell)
 
 
-def cell_table(ids, y3, p_weed, cell):
-    """One row per cell: tile id, acquisition date, true weed and crop fractions, and the score s."""
+def predicted_weed(p_crop, p_weed):
+    """Pixels whose most probable class is weed: argmax over (background = 1 - crop - weed, crop, weed), a tie going to
+    the earlier class. The probabilities are first rounded to float16, as train.evaluate stores them, so that stored
+    maps (this machine), live model outputs (Colab, the demo) and every module give the same pixels."""
+    pc = np.asarray(p_crop, dtype=np.float16).astype(np.float32)
+    pw = np.asarray(p_weed, dtype=np.float16).astype(np.float32)
+    return (pw > pc) & (pw > 1 - pc - pw)
+
+
+def cell_table(ids, y3, p_crop, p_weed, cell):
+    """One row per cell: tile id, acquisition date, true weed and crop fractions, and the score s (the predicted weed
+    fraction, from the model's P(crop) and P(weed) maps)."""
     ids = np.asarray(ids)
-    if len(ids) != len(y3) or y3.shape != p_weed.shape:
-        raise ValueError(f'misaligned inputs: ids {len(ids)}, labels {y3.shape}, probabilities {p_weed.shape}')
+    if len(ids) != len(y3) or y3.shape != p_weed.shape or p_crop.shape != p_weed.shape:
+        raise ValueError(f'misaligned inputs: ids {len(ids)}, labels {y3.shape}, probabilities {p_crop.shape} and '
+                         f'{p_weed.shape}')
     w = cell_view(y3 == 2, cell).mean(axis=(2, 4))
     crop = cell_view(y3 == 1, cell).mean(axis=(2, 4))
     # float64: a float32 mean turns an exact 1 % cover (400 / 40000) into 0.0099999998 and flips a decision at tau
-    s = cell_view(p_weed.astype(np.float64), cell).mean(axis=(2, 4))
+    s = cell_view(predicted_weed(p_crop, p_weed).astype(np.float64), cell).mean(axis=(2, 4))
     tile = np.repeat(np.arange(len(ids)), w.shape[1] * w.shape[2])
     return pd.DataFrame({'tile': ids[tile], 'date': [t[:10] for t in ids[tile]], 'cell_size': cell,
                          'w': w.ravel(), 'crop': crop.ravel(), 's': s.ravel()})
@@ -99,12 +121,12 @@ def decision_metrics(d, need, w, crop):
 
 def policy_decisions(cal, test, tau, alpha, beta):
     """Thresholds from `cal` cells, decisions of every policy on `test` cells (DataFrames from cell_table)."""
-    need_cal = cal['w'].to_numpy() >= tau
+    need_cal = needs_spray(cal['w'], tau)
     s_cal = cal['s'].to_numpy()
     lam_lo = lower_threshold(s_cal[need_cal], alpha)
     lam_hi = upper_threshold(s_cal[~need_cal], beta)
     s = test['s'].to_numpy()
-    need = test['w'].to_numpy() >= tau
+    need = needs_spray(test['w'], tau)
     policies = {
         'broadcast': np.full(s.shape, SPRAY),
         'oracle': np.where(need, SPRAY, NO_SPRAY),
@@ -120,7 +142,7 @@ def policy_decisions(cal, test, tau, alpha, beta):
 def evaluate_policies(cal, test, tau, alpha, beta):
     """Calibrate on `cal` cells and evaluate every policy on `test` cells."""
     policies, info = policy_decisions(cal, test, tau, alpha, beta)
-    need = test['w'].to_numpy() >= tau
+    need = needs_spray(test['w'], tau)
     w, crop = test['w'].to_numpy(), test['crop'].to_numpy()
     return [{'policy': k, 'tau': tau, 'alpha': alpha, 'beta': beta, **info, **decision_metrics(d, need, w, crop)}
             for k, d in policies.items()]
@@ -154,7 +176,7 @@ def evaluate_crossfit(cells, fold, tau, alpha, beta):
     if res is None:
         return []
     policies, _, per_fold = res
-    need = cells['w'].to_numpy() >= tau
+    need = needs_spray(cells['w'], tau)
     w, crop = cells['w'].to_numpy(), cells['crop'].to_numpy()
     info = {'lam_lo': tuple(i['lam_lo'] for i in per_fold), 'lam_hi': tuple(i['lam_hi'] for i in per_fold),
             'n_cal_need': min(i['n_cal_need'] for i in per_fold),

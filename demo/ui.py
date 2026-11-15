@@ -135,8 +135,8 @@ def masks(split):
 
 @st.cache_data(show_spinner=False)
 def cells(key, split, cell):
-    ids, _, p_weed = probs(key, split)
-    return C.cell_table(ids, C.to_3class(masks(split)[:len(ids)]), p_weed, cell)
+    ids, p_crop, p_weed = probs(key, split)
+    return C.cell_table(ids, C.to_3class(masks(split)[:len(ids)]), p_crop, p_weed, cell)
 
 
 @st.cache_data(show_spinner=False)
