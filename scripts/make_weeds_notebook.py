@@ -592,7 +592,7 @@ Quyết định của các ô được tính một lần ở phiên đầu và �
 
 Thời gian: ở ngưỡng 1% (113 ô PHUN và CHƯA CHẮC), thời gian ước tính là khoảng 30–45 phút GPU; phép kiểm chứng chạy trên các ô PHUN và CHƯA CHẮC nên thời gian tăng theo số ô này. Mục 5 in dòng `estimated full run` sau khi chạy thử 1 ô ảnh. Kết quả lưu theo từng ô ảnh, nên nếu bị ngắt thì Run all lại sẽ chạy tiếp.
 
-**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mục 8 tạo `ket_qua_weeds_xai.zip` (khoảng 30–40 MB, có bản đồ giải thích thu nhỏ) khi đã chạy xong.
+**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mục 8 tạo `ket_qua_weeds_xai_{TAU_TAG}.zip` (khoảng 30–40 MB, có bản đồ giải thích thu nhỏ) khi đã chạy xong. File `ket_qua_weeds_xai.zip` còn trên Drive là của lần chạy trước: đừng tải nhầm.
 ''')
 
 md('## 1. Kết nối Drive và ghi mã nguồn (chạy ở **mọi** phiên)')
@@ -688,14 +688,14 @@ if summary:
 ''')
 
 md('## 8. Đóng gói kết quả (chỉ khi đã chạy xong)')
-code('''
-ZIP_OUT = BASE / 'ket_qua_weeds_xai.zip'
+code(f'''
+ZIP_OUT = BASE / 'ket_qua_weeds_xai_{TAU_TAG}.zip'  # named after the run: the zips of earlier runs stay on Drive
 if (RUN / 'xai_summary.json').exists():
     with zipfile.ZipFile(ZIP_OUT, 'w', zipfile.ZIP_DEFLATED) as z:
         for f in sorted(RUN.glob('*')):
             if f.suffix in ('.json', '.csv', '.npz'):
                 z.write(f, RESULTS / f.name)
-    print('Đã tạo', ZIP_OUT, f'({ZIP_OUT.stat().st_size / 1e6:.1f} MB)')
+    print('Đã tạo', ZIP_OUT, f'({{ZIP_OUT.stat().st_size / 1e6:.1f}} MB)')
 else:
     print('Chưa chạy xong nên chưa đóng gói: ở phiên sau Run all lại.')
 ''')
@@ -706,8 +706,8 @@ drive.flush_and_unmount()
 print('Đã ghi hết dữ liệu lên Drive. Có thể đóng phiên Colab.')
 ''')
 
-md('''
-**Bước tiếp theo:** tải `ket_qua_weeds_xai.zip` về, giải nén vào thư mục gốc của repo (sẽ tạo thư mục `results/weeds_xai/`), rồi nhờ Claude phân tích.
+md(f'''
+**Bước tiếp theo:** tải `ket_qua_weeds_xai_{TAU_TAG}.zip` về, giải nén vào thư mục gốc của repo (sẽ tạo thư mục `results/weeds_xai/`), rồi nhờ Claude phân tích.
 ''')
 
 write_notebook('colab_weeds_xai.ipynb')
@@ -742,7 +742,7 @@ Notebook này cho **mô hình chấm lại thật**: với mỗi ô PHUN và CH�
 
 Khối lượng: với điểm cũ, lần kiểm chứng ở ngưỡng 1% (113 ô) cần 2.273 lần chạy mô hình (khoảng 1 giây mỗi ô trên T4), ở ngưỡng 0,1% (182 ô) 5.251 lần (4,9 phút); thời gian tăng theo số ô được kiểm chứng và số vùng phải bỏ ở mỗi ô. Mục 5 in thời gian ước tính sau khi chạy thử 1 ô ảnh. Kết quả lưu theo từng ô ảnh, nên nếu bị ngắt thì Run all lại sẽ chạy tiếp. Chỉ cần tập test (không cần tập train).
 
-**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mục 8 tạo `ket_qua_weeds_cfcheck.zip` (chỉ có csv và json) khi đã chạy xong.
+**Cách chạy:** *Runtime → Change runtime type → T4 GPU*, rồi *Runtime → Run all*. Mục 8 tạo `ket_qua_weeds_cfcheck_{TAU_TAG}.zip` (chỉ có csv và json) khi đã chạy xong. File `ket_qua_weeds_cfcheck.zip` còn trên Drive là của lần chạy trước: đừng tải nhầm.
 ''')
 
 md('## 1. Kết nối Drive và ghi mã nguồn (chạy ở **mọi** phiên)')
@@ -836,14 +836,14 @@ if summary:
 ''')
 
 md('## 8. Đóng gói kết quả (chỉ khi đã chạy xong)')
-code('''
-ZIP_OUT = BASE / 'ket_qua_weeds_cfcheck.zip'
+code(f'''
+ZIP_OUT = BASE / 'ket_qua_weeds_cfcheck_{TAU_TAG}.zip'  # named after the run: the zips of earlier runs stay on Drive
 if (RUN / 'cfcheck_summary.json').exists():
     with zipfile.ZipFile(ZIP_OUT, 'w', zipfile.ZIP_DEFLATED) as z:
         for f in sorted(RUN.glob('*')):
             if f.suffix in ('.json', '.csv'):
                 z.write(f, RESULTS / f.name)
-    print('Đã tạo', ZIP_OUT, f'({ZIP_OUT.stat().st_size / 1e6:.1f} MB)')
+    print('Đã tạo', ZIP_OUT, f'({{ZIP_OUT.stat().st_size / 1e6:.1f}} MB)')
 else:
     print('Chưa chạy xong nên chưa đóng gói: ở phiên sau Run all lại.')
 ''')
@@ -854,8 +854,8 @@ drive.flush_and_unmount()
 print('Đã ghi hết dữ liệu lên Drive. Có thể đóng phiên Colab.')
 ''')
 
-md('''
-**Bước tiếp theo:** tải `ket_qua_weeds_cfcheck.zip` về thư mục gốc của repo rồi nhờ Claude giải nén (vào `results/weeds_cfcheck/`) và phân tích.
+md(f'''
+**Bước tiếp theo:** tải `ket_qua_weeds_cfcheck_{TAU_TAG}.zip` về thư mục gốc của repo rồi nhờ Claude giải nén (vào `results/weeds_cfcheck/`) và phân tích.
 ''')
 
 write_notebook('colab_weeds_cfcheck.ipynb')
