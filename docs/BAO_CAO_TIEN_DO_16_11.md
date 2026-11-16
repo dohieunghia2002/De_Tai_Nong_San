@@ -4,11 +4,11 @@
 
 *Bản cập nhật ngày 16/11/2026. Bản ngày 11/11/2026 được giữ nguyên để đối chiếu.*
 
-**Tóm tắt:** Drone chụp ruộng ngô. Máy tìm cỏ trên ảnh, rồi quyết định cho từng ô 50 cm × 50 cm: **PHUN**, **KHÔNG PHUN** hay **CHƯA CHẮC** (cần người ra xem). So với bản 11/11, ngưỡng "cần phun" nay có căn cứ từ tài liệu (cỏ chiếm từ 0,1% diện tích ô), và kết quả được tính ở 7 mức ngưỡng. Hiện tại:
+**Tóm tắt:** Drone chụp ruộng ngô. Máy tìm cỏ trên ảnh, rồi quyết định cho từng ô 50 cm × 50 cm: **PHUN**, **KHÔNG PHUN** hay **CHƯA CHẮC** (cần người ra xem). So với bản 11/11, ngưỡng "cần phun" nay dựa theo tài liệu (cỏ chiếm từ 0,1% diện tích ô), và kết quả được tính ở 7 mức ngưỡng. Hiện tại:
 
 - Ở ngưỡng 0,1%, **194/216 ô kiểm tra cần phun**, nên phun theo ô chỉ giảm được tối đa 10,2% diện tích so với phun cả ruộng.
 - Với mô hình chính (ảnh 5 dải phổ), hệ thống bỏ sót 7,2% số ô cần phun và phun nhầm 1/22 ô không cần phun, trong giới hạn 10% đặt ra; 7 ô cần người ra xem. Ở ngưỡng này, cách quyết định của đề tài **chưa tốt hơn** một ngưỡng cố định (bỏ sót 6,2%).
-- Ưu điểm của cách quyết định của đề tài thể hiện khi mô hình tìm cỏ yếu hơn: với mô hình chỉ dùng ảnh màu (RGB), ngưỡng cố định bỏ sót **28,9%** số ô cần phun, còn cách của đề tài **không bỏ sót ô nào**, đổi lại 36,1% số ô phải có người ra xem.
+- Ưu điểm của cách quyết định của đề tài thể hiện khi mô hình tìm cỏ yếu hơn: với mô hình chỉ dùng ảnh màu (RGB), ngưỡng cố định bỏ sót **28,9%** số ô cần phun, còn cách của đề tài **không bỏ sót ô nào**, đổi lại 36,1% số ô phải có người ra xem (vượt mức 30% đặt ra).
 - Các quyết định PHUN và CHƯA CHẮC có **lời giải thích đã được kiểm chứng bằng mô hình**, ví dụ "bỏ các vùng cỏ này thì hệ thống không còn quyết định phun ô này".
 
 ## Thay đổi so với bản 11/11
@@ -19,7 +19,10 @@
 | Lượng cỏ dự đoán của một ô | Trung bình xác suất cỏ của các điểm ảnh trong ô | Tỉ lệ điểm ảnh trong ô mà mô hình xếp vào lớp cỏ |
 | Tiêu chí giảm thuốc | Giảm ít nhất 30% | Giảm ít nhất 60% mức giảm tối đa có thể (ở ngưỡng 1%, đúng bằng 30% như trước) |
 
-- **Vì sao đổi cách tính lượng cỏ dự đoán:** với cách cũ, một ô bị thay toàn bộ bằng đất trống vẫn được chấm khoảng 3,1 cm² cỏ (trung vị của 7 ô; đó là tổng các xác suất cỏ rất nhỏ trên 40 000 điểm ảnh), trong khi ngưỡng phun ở mức 0,1% chỉ là 4,2–5,9 cm². Với cách mới, 7 ô không có cỏ theo nhãn được chấm 0 cm² (trung vị).
+- **Vì sao đổi cách tính lượng cỏ dự đoán:** với cách cũ, các xác suất cỏ rất nhỏ trên 40 000 điểm ảnh của một ô cộng lại thành một "mức nền", trong khi ngưỡng phun tính theo cách cũ ở mức 0,1% chỉ là 4,2–5,9 cm².
+  - 7 ô không có cỏ theo nhãn vẫn được chấm 1,0 cm² cỏ (trung vị; cao nhất 3,4 cm²).
+  - Trong phép kiểm chứng bằng mô hình, ô bị thay toàn bộ bằng đất trống vẫn được chấm khoảng 3,1 cm² (trung vị của 7 ô).
+  - Với cách mới, chính 7 ô không có cỏ ở trên được chấm 0 cm² (trung vị; cao nhất 0,4 cm²).
 - **Vì sao đổi tiêu chí giảm thuốc:** ở ngưỡng 0,1%, ngay cả khi biết trước ô nào cần phun cũng chỉ giảm được 10,2%, nên mức cố định 30% không cách nào đạt được.
 - Các con số của bản 11/11 (ví dụ "giảm khoảng một nửa diện tích phun") là của ngưỡng 1% với cách tính cũ, không so trực tiếp được với bản này.
 
@@ -61,7 +64,10 @@
 1. **Bản đồ cỏ:** mỗi điểm ảnh là đất, ngô hay cỏ.
 2. **Quyết định cho từng ô 50 cm × 50 cm:** PHUN / KHÔNG PHUN / CHƯA CHẮC, kèm lời giải thích.
 
-**Khi nào một ô "cần phun":** khi cỏ chiếm từ 0,1% diện tích ô trở lên, tức khoảng 2,5 cm² trong ô 50 cm × 50 cm. Mức này nằm trong khoảng ngưỡng kinh tế 0,06–0,31% diện tích cỏ mà các chuyên gia tư vấn cây trồng đặt khi xem ảnh (Longchamps và cộng sự, Weed Science 2014). Kết quả còn được tính ở 7 mức để xem kết luận có đổi theo ngưỡng không: có cỏ là phun, 0,06%, 0,1%, 0,31%, 0,5%, 1%, 2%.
+**Khi nào một ô "cần phun":** khi cỏ chiếm từ 0,1% diện tích ô trở lên, tức khoảng 2,5 cm² trong ô 50 cm × 50 cm.
+- Mức này nằm trong khoảng ngưỡng kinh tế 0,06–0,31% diện tích cỏ mà các chuyên gia tư vấn đặt khi đánh giá hơn 2.500 ảnh (Longchamps và cộng sự, Weed Science 2014; đề tài mới đọc phần tóm tắt).
+- Lưu ý: ảnh trong nghiên cứu đó rộng 2 m × 3 m, còn ô của đề tài là 0,5 m × 0,5 m, nên chỉ mượn được mức phần trăm, không chuyển thẳng ngưỡng giữa hai kích thước được.
+- Kết quả còn được tính ở 7 mức để xem kết luận có đổi theo ngưỡng không: có cỏ là phun (ngưỡng 0, như thí nghiệm phun cỏ trên ngô của Allmendinger và cộng sự, Plants 2024), 0,06%, 0,1%, 0,31%, 0,5%, 1%, 2%.
 
 **Đo kết quả bằng 4 con số** (chỉ số giảm thuốc lấy theo Melki và cộng sự, 2025):
 
@@ -141,7 +147,9 @@ Mô hình của tác giả, ảnh 5 dải, ngưỡng "cần phun" 0,1%:
 | 2% | 75/216 | 1,3% / 6,4% | 1,3% / 0% / 8,8% |
 
 - Với mô hình 5 dải, ở ngưỡng 0,31%, 0,5% và 2%, cách của đề tài phun nhầm ít hơn ngưỡng cố định (5,8%, 5,6% và 0% so với 9,6%, 8,3% và 6,4%), đổi lại bỏ sót bằng hoặc nhiều hơn một chút. Ở ngưỡng 1% nó hơn ở cả hai chỉ số (bỏ sót 2,8% so với 6,5%, phun nhầm 2,8% so với 5,6%). Ở ngưỡng 0,1% hai cách gần như nhau.
-- Ở ngưỡng rất thấp (có cỏ là phun, 0,06%), gần như mọi ô đều cần phun, chỉ còn 7 và 15 ô "không cần phun" để tính ngưỡng: cách của đề tài phải để 87,0% và 45,4% số ô ở trạng thái CHƯA CHẮC.
+- Ở ngưỡng rất thấp (có cỏ là phun, 0,06%), gần như mọi ô đều cần phun: cả tập kiểm tra chỉ có 7 và 15 ô không cần phun.
+  - Muốn đặt ngưỡng phun với giới hạn phun nhầm 10%, mỗi lần tính cần ít nhất 9 ô như vậy ở phần vị trí còn lại. Thiếu số đó thì không ô nào ở phần vị trí đang xét được quyết định PHUN.
+  - Vì vậy cách của đề tài để 87,0% và 45,4% số ô ở trạng thái CHƯA CHẮC; ở mức "có cỏ là phun" không có ô PHUN nào.
 - Tính trên 4 mô hình (mô hình 5 dải và RGB của tác giả, 2 lần chạy thử của đề tài) và 7 mức ngưỡng, số mô hình có bỏ sót hoặc phun nhầm vượt 10% là: với ngưỡng cố định 4, 2, 2, 3, 3, 2, 0; với cách của đề tài 2, 0, 0, 0, 2, 0, 0.
 - Thay bằng 11 mô hình tự huấn luyện khác nhau (mIoU 66,93–83,74%), ở ngưỡng 0,1%: 10/11 mô hình đạt cả 3 tiêu chí (mô hình còn lại trượt vì mIoU thấp); bỏ sót 3,6–10,3%, phun nhầm 0–9,1%, chưa chắc 0–6,9%. Một mô hình bỏ sót 10,3% (20/194 ô), vượt giới hạn đúng một ô: bảo đảm conformal chỉ đúng theo trung bình, nên một lần đo có thể vượt.
 
@@ -154,11 +162,11 @@ Mô hình của tác giả, ảnh 5 dải, ngưỡng "cần phun" 0,1%:
 | Theo lời giải thích IG | 71,5% | 36% |
 | Theo Grad-CAM (Selvaraju và cộng sự, ICCV 2017) | 5,2% | 1% |
 | Chọn ngẫu nhiên trong ô | 1,9% | 1% |
-| *Mốc so sánh: theo chính các điểm ảnh cỏ của mô hình* | *78,0%* | *48%* |
+| *Mốc so sánh: theo chính các điểm ảnh cỏ của mô hình trong ô* | *78,0%* | *48%* |
 
-- **IG trung thực:** ở 180/181 ô, xóa theo IG làm lượng cỏ dự đoán giảm nhiều hơn xóa ngẫu nhiên.
+- **IG trung thực:** ở 180/181 ô, xóa theo IG làm lượng cỏ dự đoán giảm nhiều hơn xóa ngẫu nhiên trong ô.
 - **Grad-CAM không dùng được** để giải thích từng ô.
-  - So từng ô, nó chỉ hơn xóa ngẫu nhiên ở 84/181 ô (46%), gần như tung đồng xu.
+  - So từng ô, nó chỉ hơn xóa ngẫu nhiên trong ô ở 84/181 ô (46%), gần như tung đồng xu.
   - Lý do: bản đồ Grad-CAM của các ô trong cùng một ô ảnh gần như giống hệt nhau (hệ số tương quan trung vị 0,983), nên nó không chỉ ra được vùng riêng của từng ô.
 - IG không hơn mốc "các điểm ảnh cỏ của mô hình" (71,5% so với 78,0%). Điều này dễ hiểu, vì lượng cỏ dự đoán chính là số điểm ảnh đó. IG có thêm thông tin về dải phổ: dải quan trọng nhất là **rìa đỏ (RE)**, đứng đầu ở 167/181 ô.
 - *"Trung thực" nghĩa là lời giải thích phản ánh đúng cách mô hình quyết định. Nó không có nghĩa là mô hình nhận đúng cỏ.*
@@ -169,8 +177,8 @@ Mô hình của tác giả, ảnh 5 dải, ngưỡng "cần phun" 0,1%:
   - Vì vậy người kiểm tra biết ngay **nên xem chỗ nào trước**: 1–3 vùng 5 cm mà quyết định phụ thuộc vào.
   - Đây là chỗ xem trước, không thay cho việc xem cả ô, vì cỏ mà mô hình bỏ sót có thể nằm ở chỗ khác.
 - **Hai cách tính:**
-  - *ước lượng nhanh* (trừ số điểm ảnh cỏ của các vùng bị bỏ, không cần chạy lại mô hình) đúng chính xác ở 68/174 ô PHUN (39%) và lệch không quá 1 vùng ở 114/174 ô (66%). Nó lệch theo cả hai phía: mô hình cần bỏ nhiều vùng hơn ở 56 ô, ít hơn ở 50 ô. Với các ô mong manh (ước lượng không quá 2 vùng), ước lượng đúng ở 20/25 ô;
-  - mô hình không phải lúc nào cũng "càng bỏ càng ít cỏ": 30 ô hết PHUN rồi lại thành PHUN khi bỏ thêm vùng, và 4 ô bỏ hết 100 vùng vẫn chưa thành KHÔNG PHUN;
+  - *ước lượng nhanh* (trừ số điểm ảnh cỏ của các vùng bị bỏ, không cần chạy lại mô hình) đúng chính xác ở 68/174 ô PHUN (39%) và lệch không quá 1 vùng ở 114/174 ô (66%). Nó lệch theo cả hai phía: mô hình cần bỏ nhiều vùng hơn ở 56 ô, ít hơn ở 50 ô. Ở các ô mà ước lượng chỉ cần bỏ không quá 2 vùng, ước lượng đúng ở 20/25 ô;
+  - mô hình không phải lúc nào cũng "càng bỏ càng ít cỏ": 29 ô PHUN đã hết PHUN rồi lại thành PHUN khi bỏ thêm vùng (thêm 1 ô CHƯA CHẮC bị chuyển thành PHUN khi bỏ vùng), và 4 ô PHUN bỏ hết 100 vùng vẫn chưa thành KHÔNG PHUN;
   - vì vậy lời giải thích chính thức dùng số **đã kiểm chứng bằng mô hình**, mất khoảng 1,2 giây mỗi ô trên GPU T4 của Colab.
 
 Ví dụ ba ô, được chọn theo quy tắc cố định:
@@ -179,11 +187,11 @@ Ví dụ ba ô, được chọn theo quy tắc cố định:
 
 ### 4.4. Hạn chế cần lưu ý
 
-- **Tập kiểm tra nhỏ** (216 ô, 8 vị trí). Ở ngưỡng 0,1% chỉ có 22 ô không cần phun, nên mỗi ô phun nhầm đã là 4,5%.
+- **Tập kiểm tra nhỏ** (216 ô, 8 vị trí). Ở ngưỡng 0,1% chỉ có 22 ô không cần phun, nên mỗi ô phun nhầm đã là 4,5%. Mỗi lần tính ngưỡng chỉ có 9 và 13 ô không cần phun, vừa đủ mức tối thiểu 9 ô để đặt được ngưỡng phun.
 - **Một ruộng, một mùa vụ.** Chưa kiểm tra trên ruộng khác.
 - **Ở ngưỡng thấp, lợi ích của phun theo ô nhỏ**, vì cỏ có ở gần mọi ô: tối đa 10,2% ở ngưỡng 0,1%.
-- **Kích thước ô 50 cm chưa có căn cứ.** Nó nên khớp với vùng mà máy phun điều khiển riêng được. Thử ô 25 cm (cùng ngưỡng 0,1%): diện tích phun giảm 30,1% (tối đa có thể 25,9%), 16/864 ô CHƯA CHẮC, nhưng bỏ sót 8,9% và phun nhầm 9,4%, sát giới hạn 10%.
-- **Hiệu chỉnh riêng cho từng đợt bay chưa dùng được.** Ở ngày 30/5 và 6/6, gần như mọi ô đều cần phun (70/72 và 72/72 ô), nên không đủ ô "không cần phun" để tính ngưỡng: 90,3% và 91,7% số ô thành CHƯA CHẮC.
+- **Kích thước ô 50 cm chưa có căn cứ.** Nó nên khớp với vùng mà máy phun điều khiển riêng được. Thử ô 25 cm (cùng ngưỡng 0,1%): diện tích phun giảm 30,1% (tối đa có thể 25,9%), 16/864 ô CHƯA CHẮC, nhưng bỏ sót 8,9% và phun nhầm 9,4%, sát giới hạn 10%. Hai kết quả không so sánh trực tiếp hoàn toàn được: cùng ngưỡng 0,1%, nhưng ô nhỏ chỉ cần ít cỏ hơn là đã "cần phun".
+- **Hiệu chỉnh riêng cho từng đợt bay chưa dùng được.** Ở cả ba đợt bay, tỉ lệ ô CHƯA CHẮC đều vượt 30%: 37,5% ngày 25/5, 90,3% ngày 30/5 và 91,7% ngày 6/6. Ở hai ngày sau, gần như mọi ô đều cần phun (70/72 và 72/72 ô), nên không đủ ô "không cần phun" để tính ngưỡng.
 
 ## 5. Việc tiếp theo và điểm cần thầy góp ý
 

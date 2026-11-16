@@ -272,7 +272,7 @@ Người dùng chạy `colab_weeds_cfcheck.ipynb` (thư mục Drive `cfcheck_aut
   - k hết PHUN (174 ô PHUN): ước lượng đúng 68 ô (39,1%; điểm cũ 32,8%), lệch không quá 1 vùng ở 114 ô (65,5%; 53,9%). Mô hình cần nhiều vùng hơn ước lượng ở 56 ô (32,2%; 46,7%), ít hơn ở 50 ô.
   - Ô PHUN mong manh (ước lượng ≤ 2 vùng): đúng 20/25 (80%), lệch không quá 1 vùng 23/25.
   - k thành KHÔNG PHUN: đúng 64/177 (36,2%), lệch không quá 1 vùng 113/177 (63,8%); 4 ô đã bỏ hết vùng vẫn không thành KHÔNG PHUN.
-  - 30 ô PHUN (17,2%) lại thành PHUN khi bỏ thêm vùng sau lúc đã hết PHUN; 24 ô rời KHÔNG PHUN.
+  - 29 ô PHUN (16,7%) lại thành PHUN khi bỏ thêm vùng sau lúc đã hết PHUN, và 1 ô CHƯA CHẮC (`2023-05-25_0170` ô 3) bị chuyển thành PHUN khi bỏ vùng. Số 30 trong `cfcheck_summary.json` (`reverts_to_spray`) đếm cả ô CHƯA CHẮC. Có 24 ô rời KHÔNG PHUN rồi đổi lại.
   - Kết luận giữ nguyên: ước lượng nhanh chỉ gần đúng vì mô hình nhìn cả ngữ cảnh quanh vùng bị bỏ, nên lời giải thích trong báo cáo dùng k đã được mô hình kiểm chứng. Điểm mới làm ước lượng khớp hơn.
   - Kiểm tra trước khi giải nén:
     - cấu hình đúng, kể cả mã băm `decisions.csv` của lần chạy XAI;
