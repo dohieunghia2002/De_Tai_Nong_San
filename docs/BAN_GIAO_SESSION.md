@@ -6,24 +6,17 @@
 
 **Trạng thái:**
 - **Thiết lập chính:** ô 0,5 m, τ = 0,1%, điểm s là tỉ lệ điểm ảnh mà mô hình xếp vào lớp cỏ, α = β = 0,1, gộp 3 đợt bay trước ngày phun, hiệu chỉnh chéo 2 phần theo vị trí. Xem CLAUDE.md, mục "Tầng quyết định".
-- **Kết quả trong `results/` đã theo điểm s mới (mục 3.7):** 4 thư mục có bản đồ xác suất (2 mô hình tác giả, 2 lần chạy thử), 12 mô hình tự huấn luyện, XAI, phản thực và kiểm chứng phản thực. Ngoại lệ duy nhất: các dòng plug-in ở τ = 0 của 12 mô hình tự huấn luyện (việc 1 dưới đây).
+- **Kết quả trong `results/` đã theo điểm s mới (mục 3.7):** 4 thư mục có bản đồ xác suất (2 mô hình tác giả, 2 lần chạy thử), 12 mô hình tự huấn luyện, XAI, phản thực và kiểm chứng phản thực. Các dòng plug-in ở τ = 0 của 12 mô hình tự huấn luyện đã tính lại ngày 16/11 bằng `colab_weeds_runs_rescore.ipynb` (kiểm tra ở mục 3.7).
 - **Demo, 3 hình và báo cáo tiến độ đã cập nhật.** Báo cáo mới là `docs/BAO_CAO_TIEN_DO_16_11.md` (đã review: mọi số đếm lại từ bảng từng ô); bản 11/11 giữ nguyên để đối chiếu.
 - **Phát hiện chính phải trình bày đúng** (CLAUDE.md, mục "Lưu ý"): ở τ = 0,1% với mô hình 5 dải, conformal không hơn plug-in. Ưu điểm của conformal thể hiện ở mô hình RGB và ở τ = 1%.
 - **Git:** mọi thay đổi đã commit và push lên `main`. Thư mục `test_demo/` (ảnh của bộ dữ liệu, dùng để quay demo) cố ý không commit.
 - **Test:** 108 test đạt, kể cả test chậm (`WEEDS_SLOW_TESTS=1`), chạy ngày 16/11 sau mọi thay đổi của phiên.
 
 **Việc cần làm tiếp, theo thứ tự:**
-1. **Người dùng chạy lại `notebooks/colab_weeds_runs_rescore.ipynb`**, vì đã sửa plug-in ở τ = 0 ngày 16/11.
-   - Cách chạy: chỉ cần CPU, đúng tài khoản Google đã chạy `colab_weeds_runs.ipynb`. Xóa file `ket_qua_weeds_runs_argmax.zip` cũ ở thư mục gốc repo trước khi tải zip mới.
-   - Khi người dùng mang zip về, Claude kiểm tra rồi mới giải nén vào `results/weeds_runs/`:
-     - tên file phải trùng 55 file hiện có;
-     - 30 file json huấn luyện phải giống từng byte bản trên máy;
-     - so với file hiện có, chỉ các dòng `policy == plug_in`, `tau == 0` của `decision_metrics.csv` được đổi; `go_no_go.json` và `runs_summary.csv` không đổi.
-   - Script kiểm tra lần trước nằm trong thư mục tạm của phiên cũ, không còn; viết lại theo mục 6, bước 3c (2).
-2. **Viết bài báo 12–15 trang trên Overleaf** (việc chính, mục 1). Lấy báo cáo 16/11 làm khung số liệu, trình bày đúng phát hiện chính, đối sánh với các nghiên cứu khác (mục 3, 3.1, 3.2).
-3. **Nếu người dùng cần, xuất báo cáo 16/11 ra PDF** từ bản có hình `data/weedsgalore/BAO_CAO_TIEN_DO_16_11_co_hinh.md`. Lần trước xuất bằng marked.js và trình duyệt Edge chạy ẩn; hỏi người dùng trước khi chạy Edge.
-4. **Chờ thầy trả lời** ba điểm ở mục 1, ý 4.
-5. **Nếu bài báo cần dẫn chặt:** đọc toàn văn Longchamps 2014 (mới đọc tóm tắt), Ali 2015 và Nikolić 2025 (mục 3.2).
+1. **Viết bài báo 12–15 trang trên Overleaf** (việc chính, mục 1). Lấy báo cáo 16/11 làm khung số liệu, trình bày đúng phát hiện chính, đối sánh với các nghiên cứu khác (mục 3, 3.1, 3.2).
+2. **Nếu người dùng cần, xuất báo cáo 16/11 ra PDF** từ bản có hình `data/weedsgalore/BAO_CAO_TIEN_DO_16_11_co_hinh.md`. Lần trước xuất bằng marked.js và trình duyệt Edge chạy ẩn; hỏi người dùng trước khi chạy Edge.
+3. **Chờ thầy trả lời** ba điểm ở mục 1, ý 4.
+4. **Nếu bài báo cần dẫn chặt:** đọc toàn văn Longchamps 2014 (mới đọc tóm tắt), Ali 2015 và Nikolić 2025 (mục 3.2).
 
 **Lưu ý kỹ thuật (16/11):**
 - **Hòa giữa điểm và ngưỡng:** điểm và ngưỡng là tỉ lệ điểm ảnh nên có thể bằng nhau đúng. Mọi phép so điểm với ngưỡng phải đi qua `decision.decide_conformal` hoặc `decide_threshold`, vì hai hàm này dùng `decision.TIE` (mục 3.7).
@@ -287,6 +280,11 @@ Người dùng chạy `colab_weeds_cfcheck.ipynb` (thư mục Drive `cfcheck_aut
 - Lần chạy thử 1: NO-GO (C1, và CHƯA CHẮC 31,9%). Lần chạy thử 2: GO, giảm 17,1%, CHƯA CHẮC 0,9%, bỏ sót 8,2%, phun nhầm 4,5%.
 - **12 mô hình tự huấn luyện** (tính lại trên Drive bằng `colab_weeds_runs_rescore.ipynb`, 15/11, giải nén vào `results/weeds_runs/`). Kiểm tra trước khi giải nén: 30 file json huấn luyện giống từng byte bản trên máy (đúng các mô hình của phiên 2), mỗi `go_no_go.json` khớp kết luận tính lại từ `decision_metrics.csv` của nó, `runs_summary.csv` giữ nguyên các cột huấn luyện.
   - Kết luận không đổi ở cả 12 dòng: 11 GO, 1 NO-GO (`es_seed1` epoch cuối, vì C1: mIoU 66,93).
+  - **Chạy lại ngày 16/11** sau khi sửa plug-in ở τ = 0. Kiểm tra trước khi giải nén:
+    - 55 tên file trùng bản trên máy; 30 file json huấn luyện, 12 `go_no_go.json` và `runs_summary.csv` giống từng byte.
+    - Trong `decision_metrics.csv` chỉ dòng plug-in ở τ = 0 đổi: 12–14/18 dòng mỗi mô hình. Dòng không đổi là nơi ô nào cũng có điểm ảnh cỏ dự đoán, nên vẫn phun 100%.
+    - Bản cũ phun 100% ở mọi dòng plug-in ở τ = 0, nên phép kiểm tra đòi mỗi file phải có dòng đổi. Chỉ đòi "không dòng nào khác đổi" thì zip cũ, hay zip của bản notebook cũ, vẫn lọt qua.
+    - Kết quả: ở ô 0,5 m gộp 3 đợt bay (96,8% số ô cần phun), plug-in phun 85,6–99,5% số ô; ở ô 0,25 m (76,9% cần phun), 64,6–81,4%.
   - 11 mô hình khác nhau (10 mô hình của `runs_summary.csv` và lần chạy 2): 10 GO; giảm 13,4–19,0%; CHƯA CHẮC 0–6,9%; phun nhầm 0–9,1% (0–2 trên 22 ô không cần phun); bỏ sót 3,6–10,3% (7–20 trên 194 ô cần phun).
   - `es_seed2` (chọn theo val) bỏ sót 20 ô, hơn mức α × 194 = 19,4 ô đúng một ô. Bảo đảm conformal chỉ đúng theo kỳ vọng, nên một lần đo trên 194 ô có thể vượt; phải báo cáo đúng như vậy. Các ô KHÔNG PHUN của mọi mô hình chỉ chứa 0,35–0,84% tổng diện tích cỏ (`missed_weed_area`).
   - So với điểm cũ (cùng τ = 0,1%, 12 dòng), điểm mới thay đổi như sau. Phun nhầm 4,5–13,6% thành 0–9,1%; hai mô hình phun nhầm 13,6% (3/22 ô, vượt β) nay còn 4,5%. CHƯA CHẮC 0,5–26,4% thành 0–6,9%; `e100_seed2` (chọn theo val) giảm từ 26,4% xuống 3,2%. Bỏ sót 6,2–9,8% thành 3,6–10,3%; giảm 14,4–18,5% thành 13,4–19,0%.
