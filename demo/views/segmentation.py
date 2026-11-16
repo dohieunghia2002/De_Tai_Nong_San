@@ -79,7 +79,8 @@ st.dataframe(pd.DataFrame({
 }), hide_index=True, height=all_rows)
 
 names = {'weeds_pilot': 'lần 1 (batch 2)', 'weeds_pilot_b8': 'lần 2 (batch 8, dừng sớm, seed 0)'}
-options = [r for r in ['weeds_pilot', 'weeds_pilot_b8', *dict.fromkeys(runs['run'])] if C.training_history(r) is not None]
+# runs already lists the two pilot runs: dict.fromkeys keeps each run once, in this order
+options = [r for r in dict.fromkeys(['weeds_pilot', 'weeds_pilot_b8', *runs['run']]) if C.training_history(r) is not None]
 chosen = st.multiselect('Đường huấn luyện: mIoU trên tập val theo epoch (chọn tối đa 4 lần chạy)', options,
                         default=[r for r in ('weeds_pilot', 'weeds_pilot_b8') if r in options], max_selections=4,
                         format_func=lambda r: names.get(r, r))

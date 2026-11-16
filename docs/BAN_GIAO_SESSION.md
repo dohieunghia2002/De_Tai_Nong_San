@@ -10,7 +10,12 @@
 - **Demo, 3 hình và báo cáo tiến độ đã cập nhật.** Báo cáo mới là `docs/BAO_CAO_TIEN_DO_16_11.md` (đã review: mọi số đếm lại từ bảng từng ô); bản 11/11 giữ nguyên để đối chiếu.
 - **Phát hiện chính phải trình bày đúng** (CLAUDE.md, mục "Lưu ý"): ở τ = 0,1% với mô hình 5 dải, conformal không hơn plug-in. Ưu điểm của conformal thể hiện ở mô hình RGB và ở τ = 1%.
 - **Git:** mọi thay đổi đã commit và push lên `main`. Thư mục `test_demo/` (ảnh của bộ dữ liệu, dùng để quay demo) cố ý không commit.
-- **Test:** 108 test đạt, kể cả test chậm (`WEEDS_SLOW_TESTS=1`), chạy ngày 16/11 sau mọi thay đổi của phiên.
+- **Test:** 109 test đạt, kể cả test chậm (`WEEDS_SLOW_TESTS=1`), chạy ngày 16/11 sau mọi thay đổi của phiên.
+- **Review lại báo cáo 16/11 và demo (16/11, người dùng yêu cầu):**
+  - Mọi số của báo cáo được tính lại từ `results/` bằng một script độc lập; các câu về dữ liệu và bài báo được đối chiếu lại với PDF (Celikkan 2025 tr. 3–4, Celikkan 2023 tr. 1, Melki 2025 tr. 7–10).
+  - Sửa báo cáo: tương quan Grad-CAM 0,983 thành 0,965. Số 0,983 là trung vị trên 864 cặp ô; demo, bản 11/11 và mục 5 dùng trung vị trên 24 ô ảnh. Ghi rõ "7 lần với batch 8, không kể lần chạy thử đầu dùng batch 2".
+  - Sửa demo: ở τ = "có cỏ là phun", số ô đếm sai (216 ô cần phun thay vì 209, bỏ sót "28 ô" thay vì 21, phun nhầm "0/0 ô"), vì `demo/core.decide` dùng `w >= tau`; tỉ lệ vẫn đúng vì lấy từ `src.weeds`. Nay dùng `decision.needs_spray`, có test cho mức này.
+  - Sửa chữ demo: IG chia xác suất cỏ, không phải lượng cỏ dự đoán (trang đầu, trang 5, tiêu đề hình IG); câu "ngưỡng cố định gần đạt mức tốt nhất" thành "cách của đề tài chưa tốt hơn ngưỡng cố định"; danh sách đường huấn luyện bị lặp hai lần chạy thử; vài câu diễn đạt.
 
 **Việc cần làm tiếp, theo thứ tự:**
 1. **Viết bài báo 12–15 trang trên Overleaf** (việc chính, mục 1). Lấy báo cáo 16/11 làm khung số liệu, trình bày đúng phát hiện chính, đối sánh với các nghiên cứu khác (mục 3, 3.1, 3.2).
@@ -19,6 +24,7 @@
 4. **Nếu bài báo cần dẫn chặt:** đọc toàn văn Longchamps 2014 (mới đọc tóm tắt), Ali 2015 và Nikolić 2025 (mục 3.2).
 
 **Lưu ý kỹ thuật (16/11):**
+- **Nhãn "cần phun":** mọi chỗ xác định ô có cần phun không phải dùng `decision.needs_spray(w, tau)`. Ở τ = 0 ("có cỏ là phun") nó là `w > 0`; viết `w >= tau` thì ô nào cũng thành cần phun.
 - **Hòa giữa điểm và ngưỡng:** điểm và ngưỡng là tỉ lệ điểm ảnh nên có thể bằng nhau đúng. Mọi phép so điểm với ngưỡng phải đi qua `decision.decide_conformal` hoặc `decide_threshold`, vì hai hàm này dùng `decision.TIE` (mục 3.7).
 - **Sai số chữ số cuối trên GPU:** torch chia bằng cách nhân với 1/cell², nên điểm s tính trên Colab có thể lệch số tính bằng numpy 1 đơn vị ở chữ số cuối. Muốn so "giống hệt" giữa hai nguồn thì so số điểm ảnh, không so số thực.
 - **Hai lần chạy mô hình lệch nhau:** chạy mô hình theo lô 1 ảnh và lô 2 ảnh trên GPU có thể lệch 1–2 điểm ảnh cỏ trong một ô (16/216 ô). Vì vậy `check_example` cho phép lệch 2 điểm ảnh.
@@ -96,7 +102,7 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
   - bảo đảm conformal theo từng lớp;
   - hiệu chỉnh lại khi sang đợt bay mới;
   - XAI có kiểm chứng độ trung thực, bằng phép che vùng có đối chứng ngẫu nhiên.
-- **Ngưỡng phun:** đã tra cứu ngày 14/11, xem mục 3.2. **Ngưỡng τ hiện tại (1%) vẫn chỉ là minh họa.**
+- **Ngưỡng phun:** đã tra cứu ngày 14/11, xem mục 3.2. Ngưỡng τ chính đổi từ 1% (minh họa) sang 0,1% ngày 14/11, xem mục 3.3.
 
 ### 3.1. Tra cứu tính mới của giải thích phản thực (14/11/2026)
 
@@ -317,7 +323,7 @@ Người dùng chạy `colab_weeds_cfcheck.ipynb` (thư mục Drive `cfcheck_aut
   - (a) `explain.faithfulness` tính "thắng đối chứng" khi hòa tùy theo làm tròn. Tính lại trên máy từ csv thì lệch 1/181 ô ở Grad-CAM, mức xóa 0,5%. Nay hòa không tính là thắng. Summary của lần chạy Colab không đổi.
   - (b) `decide_conformal` so điểm trên đường trừ dần vùng bị bỏ với ngưỡng đọc từ csv, nên 7/216 ô có k phản thực lệch một vùng. Nay dùng `decision.TIE` = 1e-9.
   - Kiểm chứng: `decision_metrics.csv` và `go_no_go.json` của 4 thư mục có bản đồ xác suất giống từng byte; phản thực trùng với phép tính đúng tuyệt đối trên lưới điểm ảnh; các test mới bắt được cả hai lỗi trên code cũ.
-- **Plug-in ở τ = "có cỏ là phun" (sửa 16/11, người dùng đồng ý):** trước đó dùng `s >= 0` nên phun mọi ô, giống phun toàn ruộng; nay phun khi mô hình thấy ít nhất một điểm ảnh cỏ (`s > 0`), như cách định nghĩa "cần phun" ở mức này. Chỉ các dòng plug-in ở τ = 0 đổi; mọi dòng khác và `go_no_go.json` giữ nguyên từng byte. Đã tính lại 4 thư mục có bản đồ xác suất. Ví dụ mô hình 5 dải của tác giả, thiết lập chính: phun 95,8%, giảm 4,2%, bỏ sót 1,9%, phun nhầm 28,6%. 12 thư mục tự huấn luyện chờ chạy lại `colab_weeds_runs_rescore.ipynb` (notebook nay xóa zip cũ trên Drive trước khi tính).
+- **Plug-in ở τ = "có cỏ là phun" (sửa 16/11, người dùng đồng ý):** trước đó dùng `s >= 0` nên phun mọi ô, giống phun toàn ruộng; nay phun khi mô hình thấy ít nhất một điểm ảnh cỏ (`s > 0`), như cách định nghĩa "cần phun" ở mức này. Chỉ các dòng plug-in ở τ = 0 đổi; mọi dòng khác và `go_no_go.json` giữ nguyên từng byte. Đã tính lại 4 thư mục có bản đồ xác suất. Ví dụ mô hình 5 dải của tác giả, thiết lập chính: phun 95,8%, giảm 4,2%, bỏ sót 1,9%, phun nhầm 28,6%. 12 thư mục tự huấn luyện đã chạy lại `colab_weeds_runs_rescore.ipynb` ngày 16/11 (kết quả và phép kiểm tra ở mục "12 mô hình tự huấn luyện" phía trên).
 
 ## 4. Code
 

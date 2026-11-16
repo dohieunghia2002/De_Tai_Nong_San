@@ -396,8 +396,9 @@ def show_attributions(ig_map, cam_map, band_score, total_score, gap_score, sourc
 
 
 st.subheader('Dải phổ và vùng ảnh nào quan trọng')
-st.markdown('**Integrated Gradients (IG)** chia lượng cỏ dự đoán của ô cho từng điểm ảnh và từng dải phổ, so với một ảnh '
-            '"đất trống". **Grad-CAM** là phương pháp phổ biến khác, đưa vào để so sánh.')
+st.markdown('**Integrated Gradients (IG)** chia xác suất cỏ của ô (đại lượng trơn đi cùng lượng cỏ dự đoán) cho từng '
+            'điểm ảnh và từng dải phổ, so với một ảnh "đất trống". **Grad-CAM** là phương pháp phổ biến khác, đưa vào để '
+            'so sánh.')
 maps = ui.xai_maps()
 i_map = np.flatnonzero((maps['tile'] == tile_id) & (maps['cell'] == k)) if colab_xai is not None else []
 if len(i_map):

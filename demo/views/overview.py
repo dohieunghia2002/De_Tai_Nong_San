@@ -126,8 +126,9 @@ with st.expander('Hạn chế cần lưu ý khi đọc kết quả'):
         '- **Một ruộng, một mùa vụ** (Potsdam, Đức, 2023).\n'
         '- **Bảo đảm conformal chỉ gần đúng**, vì các ô nằm cạnh nhau thường giống nhau.\n'
         '- **Hiệu chỉnh riêng cho từng đợt bay còn yếu** vì quá ít ô để tính ngưỡng (thử ở trang 3, mục "Phạm vi").\n'
-        '- Khi mô hình tìm cỏ đã tốt, ngưỡng cố định cũng gần đạt mức tốt nhất; giá trị của conformal là giữ mức sai '
-        'trong giới hạn khi mô hình yếu hơn (xem trang 3 với mô hình RGB), đổi lại phải ra xem một số ô.')
+        '- Với mô hình tìm cỏ tốt (mô hình chính, thiết lập chính), cách quyết định của đề tài chưa tốt hơn ngưỡng cố '
+        'định; giá trị của conformal là giữ mức sai trong giới hạn khi mô hình yếu hơn (xem trang 3 với mô hình RGB), '
+        'đổi lại phải ra xem một số ô.')
 
 with st.expander('Cách dùng bản demo'):
     st.markdown(

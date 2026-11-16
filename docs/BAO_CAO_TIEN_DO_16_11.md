@@ -112,7 +112,7 @@ Kết quả tính trên **216 ô** của tập kiểm tra, thuộc 3 đợt bay 
 ### 4.1. Tìm cỏ trên ảnh: khớp bài báo gốc
 
 - Chạy mô hình của tác giả bằng code của đề tài cho ra **đúng số của bài báo**: mIoU 82,90% với ảnh 5 dải và 79,33% với ảnh màu thường (RGB). Như vậy code đánh giá của đề tài là đúng.
-- Đề tài tự huấn luyện 7 lần, cùng batch 8 như bài báo, với 3 lịch huấn luyện (100 epoch như tác giả, learning rate giảm dần, dừng sớm). Kết quả: mIoU 79,25–83,57% (trung bình 81,20%).
+- Đề tài tự huấn luyện 7 lần với batch 8 như bài báo (không kể lần chạy thử đầu tiên dùng batch 2), với 3 lịch huấn luyện (100 epoch như tác giả, learning rate giảm dần, dừng sớm). Kết quả: mIoU 79,25–83,57% (trung bình 81,20%).
   - Số của bài báo (82,90%) nằm trong khoảng này, nên chênh lệch chủ yếu do dao động ngẫu nhiên giữa các lần huấn luyện.
   - Còn một khác biệt chưa thử riêng: đề tài huấn luyện ở chế độ fp16 (nhanh hơn, tốn ít bộ nhớ GPU hơn), còn tác giả dùng fp32.
 
@@ -167,7 +167,7 @@ Mô hình của tác giả, ảnh 5 dải, ngưỡng "cần phun" 0,1%:
 - **IG trung thực:** ở 180/181 ô, xóa theo IG làm lượng cỏ dự đoán giảm nhiều hơn xóa ngẫu nhiên trong ô.
 - **Grad-CAM không dùng được** để giải thích từng ô.
   - So từng ô, nó chỉ hơn xóa ngẫu nhiên trong ô ở 84/181 ô (46%), gần như tung đồng xu.
-  - Lý do: bản đồ Grad-CAM của các ô trong cùng một ô ảnh gần như giống hệt nhau (hệ số tương quan trung vị 0,983), nên nó không chỉ ra được vùng riêng của từng ô.
+  - Lý do: bản đồ Grad-CAM của các ô trong cùng một ô ảnh gần như giống hệt nhau (hệ số tương quan trung vị 0,965), nên nó không chỉ ra được vùng riêng của từng ô.
 - IG không hơn mốc "các điểm ảnh cỏ của mô hình" (71,5% so với 78,0%). Điều này dễ hiểu, vì lượng cỏ dự đoán chính là số điểm ảnh đó. IG có thêm thông tin về dải phổ: dải quan trọng nhất là **rìa đỏ (RE)**, đứng đầu ở 167/181 ô.
 - *"Trung thực" nghĩa là lời giải thích phản ánh đúng cách mô hình quyết định. Nó không có nghĩa là mô hình nhận đúng cỏ.*
 

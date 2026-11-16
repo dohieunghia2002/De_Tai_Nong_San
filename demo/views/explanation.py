@@ -83,7 +83,7 @@ st.markdown(f'#### {ui.decision_badge(decision)} &nbsp; ô {cell_idx + 1} của 
 
 if decision == C.NO_SPRAY:
     no_thr, sp_thr = CF.thresholds_cm2(row)
-    need = row['w'] >= C.PRIMARY['tau']
+    need = bool(C.needs_spray(row['w'], C.PRIMARY['tau']))
     st.markdown(
         f'- **Vì sao KHÔNG PHUN:** máy thấy khoảng {ui.num(row["s"] * CELL_CM2, 1)} cm² cỏ trong ô 50 cm × 50 cm '
         f'({ui.pct(row["s"], 2)} diện tích), dưới ngưỡng không phun {ui.num(no_thr, 1)} cm².\n'

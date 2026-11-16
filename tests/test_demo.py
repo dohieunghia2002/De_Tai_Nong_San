@@ -32,7 +32,8 @@ def tables(key, cell):
 
 @needs_results
 @pytest.mark.parametrize('cell, tau, scope, calibration', [
-    (200, 0.01, 'pre-herbicide pooled', C.CAL_TEST_2FOLD),   # the primary setting
+    (200, C.PRIMARY['tau'], 'pre-herbicide pooled', C.CAL_TEST_2FOLD),   # the primary setting
+    (200, C.ANY_WEED, 'pre-herbicide pooled', C.CAL_TEST_2FOLD),  # "spray any weed": a cell needs it when w > 0
     (100, 0.005, 'pre-herbicide pooled', C.CAL_TEST_2FOLD),
     (200, 0.02, '2023-05-30', C.CAL_TEST_2FOLD),
     (200, 0.01, 'pre-herbicide pooled', C.CAL_VAL),
@@ -51,7 +52,8 @@ def test_decisions_equal_saved_results(cell, tau, scope, calibration):
         if r['n_cells'] > r['n_need']:
             assert r['n_false_spray'] == round(r['false_spray_rate'] * (r['n_cells'] - r['n_need']))
     assert len(parts) == (2 if calibration == C.CAL_TEST_2FOLD else 1)
-    assert set(cells['need']) <= {True, False} and (cells['need'] == (cells['w'] >= tau)).all()
+    # the truth src.weeds.decision uses; w >= tau would make every cell need spraying at tau = ANY_WEED
+    assert set(cells['need']) <= {True, False} and (cells['need'] == C.needs_spray(cells['w'], tau)).all()
 
 
 @needs_results

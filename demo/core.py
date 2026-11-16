@@ -27,7 +27,7 @@ from src.weeds.counterfactual import GSD_CM, PATCH  # noqa: E402,F401
 from src.weeds.data import (BANDS, DATES, PRE_HERBICIDE_DATES, ROOT, SEMANTIC_CLASSES, SPLITS, TILE,  # noqa: E402,F401
                             location_blocks, read_png, read_tile, split_ids, tile_date, to_3class)
 from src.weeds.decision import (ANY_WEED, DEFER, NO_SPRAY, SPRAY, cell_table, crossfit_decisions,  # noqa: E402,F401
-                                evaluate_crossfit, evaluate_policies, policy_decisions, predicted_weed)
+                                evaluate_crossfit, evaluate_policies, needs_spray, policy_decisions, predicted_weed)
 
 ZIP = Path(os.environ.get('WEEDSGALORE_ZIP', ROOT_DIR / 'data/weedsgalore/weedsgalore-dataset.zip'))
 RESULTS = ROOT_DIR / 'results'
@@ -151,7 +151,7 @@ def decide(test_cells, val_cells, fold_of, tau, alpha, beta, dates, calibration)
         parts = [info]
     else:
         raise ValueError(f'unknown calibration: {calibration}')
-    need = (t['w'] >= tau).to_numpy()
+    need = needs_spray(t['w'], tau)  # w > 0 at tau = ANY_WEED: w >= 0 would count every cell as needing spraying
     t['need'] = need
     metrics = pd.DataFrame(rows).set_index('policy')
     for name, d in policies.items():

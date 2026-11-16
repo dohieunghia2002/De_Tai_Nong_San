@@ -114,10 +114,10 @@ st.markdown('**Tương quan giữa bản đồ của các ô trong cùng một �
 c1, c2, _ = st.columns(3)
 c1.metric('IG', ui.num(corr_ig.median(), 3), border=True)
 c2.metric('Grad-CAM', ui.num(corr_gc.median(), 3), border=True)
-st.caption(f'Tính lại ngay từ `results/weeds_xai/xai_maps.npz` (trung vị; phần dương của bản đồ; tương quan trung bình '
-           f'theo từng ô ảnh, {len(corr_gc)} ô ảnh). Grad-CAM gộp gradient thành một trọng số cho mỗi kênh trên cả bản '
-           'đồ đặc trưng, nên nó chỉ ra mọi chỗ "giống cỏ" trên ô ảnh, không riêng ô đang quyết định. Đây là bản chất '
-           'của phương pháp, không phải lỗi code.')
+st.caption(f'Tính lại ngay từ `results/weeds_xai/xai_maps.npz` (trung vị; phần đóng góp trong ô tính trên phần dương '
+           f'của bản đồ; tương quan tính trên cả bản đồ, trung bình theo từng ô ảnh, {len(corr_gc)} ô ảnh). Grad-CAM '
+           'gộp gradient thành một trọng số cho mỗi kênh trên cả bản đồ đặc trưng, nên nó chỉ ra mọi chỗ "giống cỏ" trên '
+           'ô ảnh, không riêng ô đang quyết định. Đây là bản chất của phương pháp, không phải lỗi code.')
 
 st.subheader('Dải phổ nào quan trọng (theo IG)')
 shares, top = C.band_shares(xc)
@@ -134,7 +134,7 @@ lead = band.sort_values('top', ascending=False).iloc[0]
 negative = [b for b, v in zip(band['band'], band['median']) if v < 0]
 st.caption(f'{len(top)} ô PHUN và CHƯA CHẮC; nguồn `results/weeds_xai/xai_cells.csv`. Dải **{lead["band"]}** đóng góp '
            f'nhiều nhất ở {lead["top"]}/{len(top)} ô (RE: rìa đỏ, NIR: cận hồng ngoại).'
-           + (f' Dải {", ".join(negative)} có đóng góp âm (trung vị): chúng kéo lượng cỏ dự đoán xuống.' if negative
+           + (f' Dải {", ".join(negative)} có đóng góp âm (trung vị): chúng kéo xác suất cỏ của ô xuống.' if negative
               else ''))
 
 st.subheader('Kiểm chứng giải thích phản thực bằng mô hình')
@@ -166,8 +166,8 @@ st.markdown(
     f'- Ước lượng nhanh **lệch theo cả hai phía**: mô hình cần bỏ nhiều vùng hơn ở {k["estimate_too_small"]} ô (cột '
     f'dương), ít hơn ở {k["estimate_too_large"]} ô, vì xóa một vùng cũng làm mô hình nhìn khác các vùng xung quanh. Vì '
     'vậy lời giải thích đưa vào báo cáo dùng **số đã được mô hình kiểm chứng**.\n'
-    f'- **Quyết định mong manh là có thật:** mô hình xác nhận {int((sp["k_not_spray_model"] <= 1).sum())} ô PHUN hết '
-    f'phun chỉ khi bỏ 1 vùng (ước lượng: {int((sp["k_not_spray_estimate"] <= 1).sum())} ô); '
+    f'- **Quyết định mong manh là có thật:** mô hình xác nhận {int((sp["k_not_spray_model"] <= 1).sum())} ô PHUN chỉ '
+    f'cần bỏ 1 vùng là hết PHUN (ước lượng: {int((sp["k_not_spray_estimate"] <= 1).sum())} ô); '
     f'{int((sp["k_not_spray_model"] <= 2).sum())} ô với tối đa 2 vùng (ước lượng '
     f'{int((sp["k_not_spray_estimate"] <= 2).sum())}).\n'
     f'- **{len(de)} ô CHƯA CHẮC:** bỏ ' + ', '.join(

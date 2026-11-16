@@ -263,7 +263,7 @@ def attribution_panels(rgb, ig, grad_cam, cell_idx, colour):
     lim = float(np.abs(ig).max()) or 1.0
     pool = C.TILE / ig.shape[0]
     panels = ((rgb, None, 'Ảnh màu thật', None),
-              (ig, dict(cmap='RdBu_r', vmin=-lim, vmax=lim), 'Integrated Gradients (IG)\nđỏ: đẩy lượng cỏ lên · xanh: kéo xuống', None),
+              (ig, dict(cmap='RdBu_r', vmin=-lim, vmax=lim), 'Integrated Gradients (IG)\nđỏ: đẩy xác suất cỏ lên · xanh: kéo xuống', None),
               (grad_cam, dict(cmap='Greys', vmin=0, vmax=float(grad_cam.max()) or 1.0),
                'Grad-CAM\ncàng đậm, càng "quan trọng"', None))
     for ax, (img, kw, title, _) in zip(axs, panels):

@@ -25,7 +25,8 @@ from PIL import Image
 import core as C
 from src.weeds.authors import CKPT_ZIP_BYTES, CKPT_URL  # noqa: F401  (CKPT_URL: shown on the page)
 from src.weeds.counterfactual import counterfactual_table, ranked_patches, removal_path
-from src.weeds.decision import cell_table, decide_conformal, lower_threshold, predicted_weed, upper_threshold
+from src.weeds.decision import (cell_table, decide_conformal, lower_threshold, needs_spray, predicted_weed,
+                                upper_threshold)
 
 MODEL_NAME = 'dlv3p_msi_3'
 CKPT_DIR = C.IMAGES / 'ckpts'           # data/ is not in git
@@ -187,7 +188,7 @@ def thresholds(tile_id, split, test_cells, fold_of, tau=TAU, alpha=C.ALPHA, beta
         cal, how = pool[pool['tile'].map(fold_of) != fold_of[tile_id]], 'crossfit'
     else:
         cal, how = pool, 'all'
-    need = (cal['w'] >= tau).to_numpy()
+    need = needs_spray(cal['w'], tau)
     s = cal['s'].to_numpy()
     return {'lam_lo': lower_threshold(s[need], alpha), 'lam_hi': upper_threshold(s[~need], beta), 'how': how,
             'n_need': int(need.sum()), 'n_no_need': int((~need).sum()), 'locations': int(cal['tile'].nunique())}
@@ -205,7 +206,7 @@ def decide_tile(p_crop, p_weed, mask, tile_id, thr, cell=CELL, tau=TAU):
         t[['w', 'crop']] = np.nan
         t['need'] = pd.NA
     else:
-        t['need'] = t['w'] >= tau
+        t['need'] = needs_spray(t['w'], tau)
     return t
 
 

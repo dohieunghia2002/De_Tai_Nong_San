@@ -131,9 +131,10 @@ with st.expander('Hai ngưỡng được tính ra sao, và giá trị hiện t�
                     'Ô hiệu chỉnh cần phun / không cần': f'{p["n_cal_need"]} / {p["n_cal_no_need"]}'})
     st.dataframe(pd.DataFrame(thr), hide_index=True)
     st.markdown(
-        '- **Ngưỡng chặn bỏ sót** λ_lo: trong các ô *cần phun* dùng để hiệu chỉnh, chỉ khoảng α ô có lượng cỏ dự đoán '
-        'thấp hơn λ_lo. Vì vậy ô mới dưới λ_lo mới được KHÔNG PHUN.\n'
-        '- **Ngưỡng chặn phun nhầm** λ_hi: trong các ô *không cần phun*, chỉ khoảng β ô vượt λ_hi. Vì vậy ô mới trên '
+        '- **Ngưỡng chặn bỏ sót** λ_lo: trong các ô *cần phun* dùng để hiệu chỉnh, chỉ khoảng tỉ lệ α số ô có lượng '
+        'cỏ dự đoán thấp hơn λ_lo. Vì vậy ô mới dưới λ_lo mới được KHÔNG PHUN.\n'
+        '- **Ngưỡng chặn phun nhầm** λ_hi: trong các ô *không cần phun*, chỉ khoảng tỉ lệ β số ô vượt λ_hi. Vì vậy ô '
+        'mới trên '
         'λ_hi mới được PHUN.\n'
         '- Ô nằm giữa hai ngưỡng là CHƯA CHẮC. Khi λ_hi < λ_lo, ô nằm giữa bị loại cả "cần phun" lẫn "không cần phun", '
         'nên cũng là CHƯA CHẮC; bảng trên ghi ngưỡng nhỏ là "không phun", ngưỡng lớn là "phun".\n'
