@@ -42,6 +42,11 @@ def num(v, digits=0):
     return f'{v:.{digits}f}'.replace('.', ',')
 
 
+def cm2(v):
+    """An area in cm^2: one decimal below 10 cm^2 (the thresholds at tau = 0.1 % are 2 to 5 cm^2), none above."""
+    return num(v, 1 if abs(v) < 10 else 0)
+
+
 def k_or_all(k):
     """A model-checked number of patches as an int; every patch of the cell where the decision never came (NaN)."""
     return int(k) if np.isfinite(k) else (CELL // PATCH) ** 2
@@ -91,9 +96,9 @@ def text_lines(key, c, steps, add_to_spray_cm2):
     name = DECISION[int(c['decision_rescored'])][0]
     weed = c['s_model'] * CELL_CM2
     no_thr, sp_thr = thresholds_cm2(c)
-    where = (f'từ ngưỡng phun {num(sp_thr)} cm² trở lên' if c['decision_rescored'] == SPRAY else
-             f'nằm giữa ngưỡng không phun {num(no_thr)} cm² và ngưỡng phun {num(sp_thr)} cm²')
-    why = (f'Vì sao {name}: mô hình thấy khoảng {num(weed)} cm² cỏ trong ô 50 cm × 50 cm '
+    where = (f'từ ngưỡng phun {cm2(sp_thr)} cm² trở lên' if c['decision_rescored'] == SPRAY else
+             f'nằm giữa ngưỡng không phun {cm2(no_thr)} cm² và ngưỡng phun {cm2(sp_thr)} cm²')
+    why = (f'Vì sao {name}: mô hình thấy khoảng {cm2(weed)} cm² cỏ trong ô 50 cm × 50 cm '
            f'({num(100 * c["s_model"], 1)}% diện tích), {where}.')
     never = not np.isfinite(c['k_no_spray_model'])  # every patch removed, and still not NO_SPRAY
     k_no = k_or_all(c['k_no_spray_model'])
@@ -102,22 +107,22 @@ def text_lines(key, c, steps, add_to_spray_cm2):
         after = int(steps.set_index('k').loc[k, 'decision_model'])
         then = ('chuyển thẳng sang KHÔNG PHUN' if after == NO_SPRAY else f'chuyển sang {DECISION[after][0]}; '
                 + ('bỏ hết các vùng của ô vẫn chưa thành KHÔNG PHUN' if never else f'bỏ {k_no} vùng thì KHÔNG PHUN'))
-        what = (f'Đổi gì thì quyết định đổi (mô hình đã chấm lại): bỏ {patch_words(k)} ({num(removed_cm2(steps, k))} '
+        what = (f'Đổi gì thì quyết định đổi (mô hình đã chấm lại): bỏ {patch_words(k)} ({cm2(removed_cm2(steps, k))} '
                 f'cm² cỏ dự đoán) thì ô {then}. Ước lượng nhanh: {int(c["k_not_spray_estimate"])} vùng.')
     elif never:
         what = ('Đổi gì thì quyết định đổi (mô hình đã chấm lại): bỏ hết các vùng của ô vẫn chưa thành KHÔNG PHUN; '
                 f'thêm khoảng {num(add_to_spray_cm2, 1)} cm² cỏ thì PHUN (theo quy tắc ngưỡng).')
     else:
         what = (f'Đổi gì thì quyết định đổi (mô hình đã chấm lại): bỏ {patch_words(k_no)} '
-                f'({num(removed_cm2(steps, k_no), 1)} cm² cỏ dự đoán) thì ô thành KHÔNG PHUN; thêm khoảng '
+                f'({cm2(removed_cm2(steps, k_no))} cm² cỏ dự đoán) thì ô thành KHÔNG PHUN; thêm khoảng '
                 f'{num(add_to_spray_cm2, 1)} cm² cỏ thì PHUN (theo quy tắc ngưỡng). Người kiểm tra nên xem '
                 f'{"vùng" if k_no == 1 else f"{k_no} vùng"} này trước.')
-    cm2 = band_cm2(c)
-    up = sorted((b for b in BANDS if cm2[b] > 0), key=cm2.get, reverse=True)[:2]
-    down = min(BANDS, key=cm2.get)
-    bands = ' và '.join(f'{b} ({signed(cm2[b])} cm²)' for b in up) + ' đẩy lượng cỏ dự đoán lên nhiều nhất'
-    if cm2[down] < 0:
-        bands += f'; {down} kéo xuống nhiều nhất ({signed(cm2[down])} cm²)'
+    per_band = band_cm2(c)
+    up = sorted((b for b in BANDS if per_band[b] > 0), key=per_band.get, reverse=True)[:2]
+    down = min(BANDS, key=per_band.get)
+    bands = ' và '.join(f'{b} ({signed(per_band[b])} cm²)' for b in up) + ' đẩy xác suất cỏ của ô lên nhiều nhất'
+    if per_band[down] < 0:
+        bands += f'; {down} kéo xuống nhiều nhất ({signed(per_band[down])} cm²)'
     need = c['w'] >= PRIMARY['tau']
     truth = ('ô thực sự cần phun' if need else 'ô thực ra không cần phun') + f' (ngưỡng {tau_words(PRIMARY["tau"])})'
     tail = f'Dải phổ (IG): {bands}. Nhãn thật: cỏ chiếm {num(100 * c["w"], 2)}% diện tích ô → {truth}.'
@@ -193,9 +198,9 @@ def draw_curve(ax, c, steps, estimate=True, fs=9, fs_axis=9.5, fs_tick=8.5,
     no_thr, sp_thr = thresholds_cm2(c)
     top = max(model.max(), est.max(), sp_thr) * 1.12
     crossed = c['lam_hi'] < c['lam_lo']  # then SPRAY iff s >= lam_lo and NO_SPRAY iff s <= lam_hi
-    zones = ((sp_thr, top, SPRAY, f'PHUN ({"≥" if crossed else ">"} {num(sp_thr)} cm²)'),
+    zones = ((sp_thr, top, SPRAY, f'PHUN ({"≥" if crossed else ">"} {cm2(sp_thr)} cm²)'),
              (no_thr, sp_thr, DEFER, 'CHƯA CHẮC'),
-             (0, no_thr, NO_SPRAY, f'KHÔNG PHUN ({"≤" if crossed else "<"} {num(no_thr)} cm²)'))
+             (0, no_thr, NO_SPRAY, f'KHÔNG PHUN ({"≤" if crossed else "<"} {cm2(no_thr)} cm²)'))
     mark = k_not if c['decision_rescored'] == SPRAY else k_no
     right = mark >= 0.6 * k.max()  # the marker line is in the right part: labels go left of it
     named = True
@@ -209,7 +214,7 @@ def draw_curve(ax, c, steps, estimate=True, fs=9, fs_axis=9.5, fs_tick=8.5,
     for y in (no_thr, sp_thr):
         ax.axhline(y, color=INK2, lw=0.8)
     if not named:  # thin zones: the thresholds in one line above them, on the left where the curve is high
-        ax.text(0.2, sp_thr, f'ngưỡng phun {num(sp_thr)} cm², ngưỡng không phun {num(no_thr)} cm²',
+        ax.text(0.2, sp_thr, f'ngưỡng phun {cm2(sp_thr)} cm², ngưỡng không phun {cm2(no_thr)} cm²',
                 fontsize=fs - 0.5, color=INK2, va='bottom', ha='left')
     if estimate:
         ax.plot(k, est, color=INK2, lw=1.8, ls=(0, (4, 2.5)))
@@ -289,8 +294,8 @@ def draw_row(sub, i, key, c, steps, rgb, p_cell, add_to_spray_cm2):
 
     # 5. bands behind the score: integrated gradients from bare soil, in cm^2 of predicted weed (they add up to it)
     ax = axs[4]
-    cm2 = band_cm2(c)
-    vals = np.array([cm2[b] for b in BANDS])
+    per_band = band_cm2(c)
+    vals = np.array([per_band[b] for b in BANDS])
     y = np.arange(len(BANDS))[::-1]
     ax.barh(y, vals, color=BAR, height=0.62)
     ax.axvline(0, color='#c3c2b7', lw=1)
@@ -304,7 +309,7 @@ def draw_row(sub, i, key, c, steps, rgb, p_cell, add_to_spray_cm2):
     ax.set_xticks([])
     for s in ax.spines.values():
         s.set_visible(False)
-    ax.set_title(f'Dải phổ đóng góp vào lượng cỏ dự đoán\n(IG so với đất trống, cm²; tổng {num(sum(vals))} cm²)',
+    ax.set_title(f'Dải phổ đóng góp vào xác suất cỏ của ô\n(IG so với đất trống, cm²; tổng {num(sum(vals))} cm²)',
                  fontsize=10.5, color=INK2)
 
     for n, line in enumerate(text_lines(key, c, steps, add_to_spray_cm2)):
@@ -320,11 +325,11 @@ def simple_lines(c, steps):
     and the true label."""
     dec = int(c['decision_rescored'])
     no_thr, sp_thr = thresholds_cm2(c)
-    weed = num(c['s_model'] * CELL_CM2)
+    weed = cm2(c['s_model'] * CELL_CM2)
     never = not np.isfinite(c['k_no_spray_model'])  # every patch removed, and still not NO_SPRAY
     k_no = k_or_all(c['k_no_spray_model'])
     if dec == SPRAY:
-        why = f'Máy thấy khoảng {weed} cm² cỏ trong ô, từ ngưỡng phun {num(sp_thr)} cm² trở lên → PHUN.'
+        why = f'Máy thấy khoảng {weed} cm² cỏ trong ô, từ ngưỡng phun {cm2(sp_thr)} cm² trở lên → PHUN.'
         k = int(c['k_not_spray_model'])
         after = int(steps.set_index('k').loc[k, 'decision_model'])
         more = '' if after == NO_SPRAY else ('; bỏ hết các vùng vẫn chưa thành KHÔNG PHUN' if never else
@@ -339,8 +344,8 @@ def simple_lines(c, steps):
             if k == 1:
                 change += ' Chỉ thiếu một đám cỏ nhỏ là quyết định đã đổi.'
     else:
-        why = (f'Máy thấy khoảng {weed} cm² cỏ, nằm giữa ngưỡng không phun {num(no_thr)} cm² và ngưỡng phun '
-               f'{num(sp_thr)} cm² → CHƯA CHẮC.')
+        why = (f'Máy thấy khoảng {weed} cm² cỏ, nằm giữa ngưỡng không phun {cm2(no_thr)} cm² và ngưỡng phun '
+               f'{cm2(sp_thr)} cm² → CHƯA CHẮC.')
         change = ('Bỏ hết các vùng của ô vẫn chưa thành KHÔNG PHUN.' if never else
                   f'Bỏ {patch_words(k_no)} → KHÔNG PHUN. Người kiểm tra nên xem '
                   f'{"vùng này" if k_no == 1 else "các vùng này"} trước.')
@@ -449,16 +454,16 @@ def main():
         tiles = {c['tile']: read_tile(zf, c['tile'])[0] for _, c in examples}
 
     if args.simple:  # sized for an A4 page: 9 in wide, text at least 9 pt
-        fig = plt.figure(figsize=(9, 4.6 * len(examples) + 1.0), dpi=200, facecolor='white')
-        subs = fig.subfigures(len(examples) + 1, 1, height_ratios=[4.6] * len(examples) + [1.0])
+        fig = plt.figure(figsize=(9, 4.6 * len(examples) + 1.3), dpi=200, facecolor='white')
+        subs = fig.subfigures(len(examples) + 1, 1, height_ratios=[4.6] * len(examples) + [1.3])
     else:
         fig = plt.figure(figsize=(20, 5.0 * len(examples) + 1.3), dpi=110, facecolor='white')
         subs = fig.subfigures(len(examples) + 1, 1, height_ratios=[5.0] * len(examples) + [1.3])
     for i, ((key, c), sub) in enumerate(zip(examples, subs), start=1):
         r, col = divmod(int(c['cell']), TILE // CELL)
-        i, sl = ids.index(c['tile']), (slice(r * CELL, (r + 1) * CELL), slice(col * CELL, (col + 1) * CELL))
-        p_cell = p_weed[i][sl]
-        check_example(c, predicted_weed(p_crop[i][sl], p_cell))
+        row, sl = ids.index(c['tile']), (slice(r * CELL, (r + 1) * CELL), slice(col * CELL, (col + 1) * CELL))
+        p_cell = p_weed[row][sl]  # (row: the tile's row in the maps; i stays the example's number in the titles)
+        check_example(c, predicted_weed(p_crop[row][sl], p_cell))
         st = steps[(steps['tile'] == c['tile']) & (steps['cell'] == c['cell'])].sort_values('k')
         rgb = composite(tiles[c['tile']], (R, G, B), lo, hi)
         if args.simple:
@@ -481,7 +486,7 @@ def main():
         f'Ngưỡng cần phun: cỏ chiếm từ {tau_words(PRIMARY["tau"])} diện tích ô (Longchamps và cộng sự, Weed Science 2014). '
         'Dữ liệu: WeedsGalore (Celikkan và cộng sự, WACV 2025), giấy phép CC BY 4.0.']
     if args.simple:
-        put_lines(subs[-1], SIMPLE_NOTES, 0.92, 9, 0.17, 130, [INK2] * len(SIMPLE_NOTES))
+        put_lines(subs[-1], SIMPLE_NOTES, 0.94, 9, 0.13, 130, [INK2] * len(SIMPLE_NOTES))  # 0.17 in a line, as before
     else:
         for n, line in enumerate(notes):
             subs[-1].text(0.012, 0.86 - 0.2 * n, line, fontsize=10, color=INK2, ha='left', va='top')

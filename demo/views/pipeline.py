@@ -379,16 +379,16 @@ if decision != C.NO_SPRAY:
 
 
 def show_attributions(ig_map, cam_map, band_score, total_score, gap_score, source):
-    """IG and Grad-CAM over the tile, and IG per band in cm^2 of predicted weed (scores times the cell area)."""
+    """IG and Grad-CAM over the tile, and IG per band in cm^2 (of the cell's mean P(weed), times the cell area)."""
     ui.figure('attribution_panels', rgb, ig_map, cam_map, k, colour)
     cm2 = np.asarray(band_score, dtype=float) * CELL_CM2
     a, b = st.columns([3, 2])
     with a:
-        ui.band_chart(cm2, 'đóng góp vào lượng cỏ dự đoán của ô (cm²)')
+        ui.band_chart(cm2, 'đóng góp vào xác suất cỏ của ô (cm²)')
     with b:
         top = int(np.argmax(cm2))
-        st.markdown(f'Dải **{C.BANDS[top]}** đẩy lượng cỏ dự đoán lên nhiều nhất ({ui.num(cm2[top], 1)} cm²).')
-        st.caption(f'Tổng các dải {ui.num(total_score * CELL_CM2, 1)} cm²; lượng cỏ dự đoán của ô so với ảnh đất trống '
+        st.markdown(f'Dải **{C.BANDS[top]}** đẩy xác suất cỏ của ô lên nhiều nhất ({ui.num(cm2[top], 1)} cm²).')
+        st.caption(f'Tổng các dải {ui.num(total_score * CELL_CM2, 1)} cm²; xác suất cỏ của ô so với ảnh đất trống '
                    f'{ui.num(gap_score * CELL_CM2, 1)} cm² (hai số phải gần bằng nhau). {source} IG trả lời "vì sao là '
                    'cỏ mà không phải đất", không trả lời "vì sao là cỏ mà không phải ngô".')
     st.caption('Trang "Kiểm chứng lời giải thích" cho thấy IG trung thực, còn Grad-CAM gần như giống nhau cho mọi ô của '

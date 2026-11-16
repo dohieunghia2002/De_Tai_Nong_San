@@ -114,14 +114,15 @@ else:
     except ValueError as e:
         st.error(f'Dữ liệu không nhất quán: {e}')
     ui.figure('removal_curve', row, st_steps, width='content')
-    st.markdown('**Dải phổ nào đẩy lượng cỏ dự đoán lên** (IG so với ảnh đất trống)')
+    st.markdown('**Dải phổ nào đẩy xác suất cỏ của ô lên** (IG so với ảnh đất trống)')
     left, right = st.columns([3, 2])
     with left:
-        ui.band_chart([row[f'ig_{b}'] * CELL_CM2 for b in C.BANDS], 'đóng góp vào lượng cỏ dự đoán của ô (cm²)')
+        ui.band_chart([row[f'ig_{b}'] * CELL_CM2 for b in C.BANDS], 'đóng góp vào xác suất cỏ của ô (cm²)')
     with right:
-        st.caption(f'Tổng các dải ≈ lượng cỏ dự đoán của ô ({ui.num(row["ig_sum"] * CELL_CM2, 1)} cm²), vì ảnh đất '
-                   'trống có lượng cỏ dự đoán gần 0. IG trả lời "vì sao là cỏ mà không phải đất", không trả lời "vì sao '
-                   'là cỏ mà không phải ngô".')
+        st.caption(f'Tổng các dải ≈ xác suất cỏ của ô quy ra diện tích ({ui.num(row["ig_sum"] * CELL_CM2, 1)} cm²), '
+                   'vì ảnh đất trống có xác suất cỏ gần 0. IG cần đạo hàm nên giải thích xác suất cỏ, đại lượng trơn đi '
+                   f'cùng lượng cỏ dự đoán ({ui.num(row["s_model"] * CELL_CM2, 1)} cm²). IG trả lời "vì sao là cỏ mà '
+                   'không phải đất", không trả lời "vì sao là cỏ mà không phải ngô".')
 
 st.markdown('##### Bản đồ giải thích trên cả ô ảnh')
 k = np.flatnonzero((maps['tile'] == tile_id) & (maps['cell'] == cell_idx))

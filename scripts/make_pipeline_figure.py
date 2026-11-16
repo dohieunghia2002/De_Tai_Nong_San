@@ -184,15 +184,22 @@ def g(v):
     return f'{v:g}'.replace('.', ',')
 
 
+def pick_tile(t):
+    """The illustrated tile, by a fixed rule (not by eye): the first tile of the decision table (the test split file's
+    order) with the most kinds of decision, i.e. with SPRAY, NO_SPRAY and DEFER cells when there is one."""
+    return t.groupby('tile', sort=False)['decision'].nunique().idxmax()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--zip', default=str(ROOT_DIR / 'data/weedsgalore/weedsgalore-dataset.zip'))
     ap.add_argument('--run', default=str(ROOT_DIR / 'results/weeds_pilot_b8'))
-    ap.add_argument('--tile', default='2023-05-30_0720')
+    ap.add_argument('--tile', default=None, help='default: pick_tile, the rule above')
     ap.add_argument('--out', default=str(ROOT_DIR / 'data/weedsgalore/so_do_pipeline.png'))
     args = ap.parse_args()
     run = Path(args.run)
     test, p_crop, p_weed, t = decisions(args.zip, run)
+    args.tile = args.tile or pick_tile(t)
     i = list(test['ids']).index(args.tile)
     cells = t[t['tile'] == args.tile]
     if cells.empty:
