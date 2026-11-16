@@ -618,7 +618,7 @@ Người dùng chạy `colab_weeds_cfcheck.ipynb` (thư mục Drive `cfcheck_aut
    - 4.1 xong: `check_example` cho lệch tới 2 điểm ảnh.
    - 4.2 xong: chữ trong demo theo τ = 0,1% và điểm mới; sửa lỗi sập trang ở 4 ô không bao giờ ra KHÔNG PHUN; thanh chọn τ có đủ 7 mức.
    - 4.3 xong: vẽ lại 3 hình. Ngưỡng nhỏ có chữ số thập phân; khung IG ghi "xác suất cỏ"; sơ đồ chọn ô ảnh theo quy tắc (`2023-05-25_0750`); sửa số thứ tự ví dụ.
-   - 4.4 (báo cáo tiến độ) **chờ người dùng quyết định cách viết**, vì câu chuyện đổi ở τ = 0,1% (số từ `decision_metrics.csv`, ô 50 cm, gộp 3 đợt bay, hiệu chỉnh chéo):
+   - 4.4 xong 16/11. Người dùng chọn viết bản mới `docs/BAO_CAO_TIEN_DO_16_11.md` và giữ nguyên bản 11/11 để đối chiếu. Mọi số tính từ `results/` bằng một script. Bản mới trình bày đúng phát hiện sau, vì câu chuyện đổi ở τ = 0,1% (số từ `decision_metrics.csv`, ô 50 cm, gộp 3 đợt bay, hiệu chỉnh chéo):
      - 194/216 ô cần phun, mức giảm tối đa 10,2%.
      - Mô hình 5 dải: conformal giảm 16,2%, CHƯA CHẮC 3,2% (7 ô), bỏ sót 7,2% (14/194), phun nhầm 4,5% (1/22). Ngưỡng cố định: giảm 15,3%, bỏ sót 6,2% (12/194), phun nhầm 4,5%. Tức là conformal không hơn ngưỡng cố định, và cả hai giảm nhiều hơn mức tối đa vì có bỏ sót.
      - Mô hình RGB: ngưỡng cố định bỏ sót 28,9% (56/194); conformal bỏ sót 0% nhưng CHƯA CHẮC 36,1% (78 ô), vượt C3.

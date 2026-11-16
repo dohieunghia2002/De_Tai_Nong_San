@@ -3,8 +3,12 @@ the image itself, embedded as JPEG (base64, reference style so the text stays re
 plain links and is the one committed; the copy holds images from the dataset, so it is written under data/ (not
 committed). Text is copied unchanged apart from the image links.
 
-  python scripts/embed_report_images.py [--src docs/BAO_CAO_TIEN_DO.md]
-                                        [--out data/weedsgalore/BAO_CAO_TIEN_DO_co_hinh.md]
+  python scripts/embed_report_images.py [--src docs/BAO_CAO_TIEN_DO_16_11.md]
+                                        [--out data/weedsgalore/BAO_CAO_TIEN_DO_16_11_co_hinh.md]
+
+The defaults are the current report (16/11/2026). The report of 11/11/2026 (docs/BAO_CAO_TIEN_DO.md) links to the same
+figure files, which have been redrawn since: its copy with the figures it was sent with is
+data/weedsgalore/BAO_CAO_TIEN_DO_co_hinh.md (and the PDF next to it); do not write that copy again.
 """
 import argparse
 import base64
@@ -43,8 +47,8 @@ def embed(text, base_dir, quality=92):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--src', default=str(ROOT_DIR / 'docs/BAO_CAO_TIEN_DO.md'))
-    ap.add_argument('--out', default=str(ROOT_DIR / 'data/weedsgalore/BAO_CAO_TIEN_DO_co_hinh.md'))
+    ap.add_argument('--src', default=str(ROOT_DIR / 'docs/BAO_CAO_TIEN_DO_16_11.md'))
+    ap.add_argument('--out', default=str(ROOT_DIR / 'data/weedsgalore/BAO_CAO_TIEN_DO_16_11_co_hinh.md'))
     args = ap.parse_args()
     src, out = Path(args.src), Path(args.out)
     text, used = embed(src.read_text(encoding='utf-8'), src.parent)
