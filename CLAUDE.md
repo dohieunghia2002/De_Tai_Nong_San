@@ -2,7 +2,7 @@
 
 Hướng dẫn cho Claude Code khi làm việc với repo này. Người dùng có thể sửa file này.
 
-## Tình trạng hiện tại (05/11/2026): đọc `docs/BAN_GIAO_SESSION.md` trước tiên
+## Tình trạng hiện tại (16/11/2026): đọc mục 0 của `docs/BAN_GIAO_SESSION.md` trước tiên (trạng thái, việc cần làm tiếp)
 
 - Đề tài: **WeedsGalore**. Phân vùng cỏ dại từ ảnh UAV đa phổ, rồi quyết định **phun / không phun / chưa quyết** cho từng ô lưới bằng conformal. Code trong `src/weeds/`, notebook Colab là `notebooks/colab_weeds_pilot.ipynb`.
 - Thí nghiệm thử:

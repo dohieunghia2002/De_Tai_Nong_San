@@ -1,6 +1,40 @@
-# Bàn giao giữa các phiên làm việc với Claude (cập nhật 14/11/2026)
+# Bàn giao giữa các phiên làm việc với Claude (cập nhật 16/11/2026)
 
 Đọc file này cùng `CLAUDE.md` trước khi làm tiếp. Mọi số liệu dưới đây lấy từ file kết quả thật, có ghi nguồn.
+
+## 0. Bắt đầu phiên mới: trạng thái và việc cần làm (16/11/2026)
+
+**Trạng thái:**
+- **Thiết lập chính:** ô 0,5 m, τ = 0,1%, điểm s là tỉ lệ điểm ảnh mà mô hình xếp vào lớp cỏ, α = β = 0,1, gộp 3 đợt bay trước ngày phun, hiệu chỉnh chéo 2 phần theo vị trí. Xem CLAUDE.md, mục "Tầng quyết định".
+- **Kết quả trong `results/` đã theo điểm s mới (mục 3.7):** 4 thư mục có bản đồ xác suất (2 mô hình tác giả, 2 lần chạy thử), 12 mô hình tự huấn luyện, XAI, phản thực và kiểm chứng phản thực. Ngoại lệ duy nhất: các dòng plug-in ở τ = 0 của 12 mô hình tự huấn luyện (việc 1 dưới đây).
+- **Demo, 3 hình và báo cáo tiến độ đã cập nhật.** Báo cáo mới là `docs/BAO_CAO_TIEN_DO_16_11.md` (đã review: mọi số đếm lại từ bảng từng ô); bản 11/11 giữ nguyên để đối chiếu.
+- **Phát hiện chính phải trình bày đúng** (CLAUDE.md, mục "Lưu ý"): ở τ = 0,1% với mô hình 5 dải, conformal không hơn plug-in. Ưu điểm của conformal thể hiện ở mô hình RGB và ở τ = 1%.
+- **Git:** mọi thay đổi đã commit và push lên `main`. Thư mục `test_demo/` (ảnh của bộ dữ liệu, dùng để quay demo) cố ý không commit.
+- **Test:** 108 test đạt, kể cả test chậm (`WEEDS_SLOW_TESTS=1`), chạy ngày 16/11 sau mọi thay đổi của phiên.
+
+**Việc cần làm tiếp, theo thứ tự:**
+1. **Người dùng chạy lại `notebooks/colab_weeds_runs_rescore.ipynb`**, vì đã sửa plug-in ở τ = 0 ngày 16/11.
+   - Cách chạy: chỉ cần CPU, đúng tài khoản Google đã chạy `colab_weeds_runs.ipynb`. Xóa file `ket_qua_weeds_runs_argmax.zip` cũ ở thư mục gốc repo trước khi tải zip mới.
+   - Khi người dùng mang zip về, Claude kiểm tra rồi mới giải nén vào `results/weeds_runs/`:
+     - tên file phải trùng 55 file hiện có;
+     - 30 file json huấn luyện phải giống từng byte bản trên máy;
+     - so với file hiện có, chỉ các dòng `policy == plug_in`, `tau == 0` của `decision_metrics.csv` được đổi; `go_no_go.json` và `runs_summary.csv` không đổi.
+   - Script kiểm tra lần trước nằm trong thư mục tạm của phiên cũ, không còn; viết lại theo mục 6, bước 3c (2).
+2. **Viết bài báo 12–15 trang trên Overleaf** (việc chính, mục 1). Lấy báo cáo 16/11 làm khung số liệu, trình bày đúng phát hiện chính, đối sánh với các nghiên cứu khác (mục 3, 3.1, 3.2).
+3. **Nếu người dùng cần, xuất báo cáo 16/11 ra PDF** từ bản có hình `data/weedsgalore/BAO_CAO_TIEN_DO_16_11_co_hinh.md`. Lần trước xuất bằng marked.js và trình duyệt Edge chạy ẩn; hỏi người dùng trước khi chạy Edge.
+4. **Chờ thầy trả lời** ba điểm ở mục 1, ý 4.
+5. **Nếu bài báo cần dẫn chặt:** đọc toàn văn Longchamps 2014 (mới đọc tóm tắt), Ali 2015 và Nikolić 2025 (mục 3.2).
+
+**Lưu ý kỹ thuật (16/11):**
+- **Hòa giữa điểm và ngưỡng:** điểm và ngưỡng là tỉ lệ điểm ảnh nên có thể bằng nhau đúng. Mọi phép so điểm với ngưỡng phải đi qua `decision.decide_conformal` hoặc `decide_threshold`, vì hai hàm này dùng `decision.TIE` (mục 3.7).
+- **Sai số chữ số cuối trên GPU:** torch chia bằng cách nhân với 1/cell², nên điểm s tính trên Colab có thể lệch số tính bằng numpy 1 đơn vị ở chữ số cuối. Muốn so "giống hệt" giữa hai nguồn thì so số điểm ảnh, không so số thực.
+- **Hai lần chạy mô hình lệch nhau:** chạy mô hình theo lô 1 ảnh và lô 2 ảnh trên GPU có thể lệch 1–2 điểm ảnh cỏ trong một ô (16/216 ô). Vì vậy `check_example` cho phép lệch 2 điểm ảnh.
+- **Báo cáo cũ:** không sinh lại `data/weedsgalore/BAO_CAO_TIEN_DO_co_hinh.md` (bản 11/11 có hình cũ). `scripts/embed_report_images.py` mặc định dùng bản 16/11.
+- **Bản sao lưu (không commit):**
+  - kết quả điểm cũ ở τ = 0,1% (xai, counterfactual, cfcheck): `data/ket_qua_cu_tau0.001_diem_cu/`;
+  - kết quả ở τ = 1%: `data/ket_qua_cu_tau1/`;
+  - hình của báo cáo 11/11: `data/weedsgalore/hinh_bao_cao_11_11/`.
+- **Tên zip:** zip kết quả XAI và cfcheck mới mang tên lần chạy (`ket_qua_weeds_xai_tau0.001_argmax.zip`, `ket_qua_weeds_cfcheck_tau0.001_argmax.zip`), để không lẫn với zip cũ còn trên Drive.
 
 ## 1. Đề tài đang ở đâu
 
@@ -642,3 +676,11 @@ Các lưu ý này đã có trong CLAUDE.md hoặc bộ nhớ, nhắc lại ở �
 - **Không gửi email hay thông tin cá nhân của người dùng tới dịch vụ bên ngoài.** Đã từng lỡ gửi email cho Unpaywall một lần.
 - Văn bản gửi thầy dùng cụm "Hệ thống hỗ trợ ra quyết định", viết đầy đủ.
 - Chỉ commit hoặc push khi người dùng đồng ý.
+
+Bài học thêm từ phiên 15–16/11:
+- **Review code hay notebook thì phải chạy thử, không chỉ đọc.**
+  - Chạy cả quy trình trên dữ liệu thật với một mô hình giả lập (ví dụ ở mục 6, bước 3c), và đối chiếu số liệu bằng một đường tính độc lập.
+  - Lần review notebook XAI ngày 15/11 chỉ đọc code nên bỏ sót hai lỗi hòa (mục 3.7).
+  - Lần review báo cáo 16/11 nhờ đếm lại từ bảng từng ô mà phát hiện một số đếm sai: 30 ô "quay lại PHUN" thật ra gồm cả 1 ô CHƯA CHẮC.
+- **Trên Windows, heredoc của Bash có thể làm hỏng dấu `\`.** Sửa file bằng công cụ Edit, hoặc viết script Python ra file rồi chạy.
+- **Người dùng muốn làm từng phần và được hỏi khi có quyết định về nội dung**, ví dụ cách viết báo cáo gửi thầy. Khi kết quả đổi câu chuyện thì báo trước, không tự viết lại.
