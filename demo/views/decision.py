@@ -28,11 +28,8 @@ def side_cm(cell):
     return ui.num(side, 0 if float(side).is_integer() else 1) + ' cm'
 
 
-def tau_text(v):
-    return ui.pct(v, 1 if round(v * 1000) % 10 else 0)
-
-
-TAUS = [0.001, 0.002, 0.005, 0.01, 0.015, 0.02, 0.03, 0.05]
+tau_text = ui.tau_text
+TAUS = sorted(set(C.TAUS) | {0.002, 0.015, 0.03, 0.05})  # the levels of the report, and a few more to explore
 RATES = [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3]
 with st.sidebar:
     st.subheader('Thiết lập')
@@ -50,7 +47,7 @@ with st.sidebar:
 
 st.title('3. Quyết định phun cho từng ô')
 st.markdown(
-    'Ruộng được chia thành ô vuông. **Lượng cỏ dự đoán** của ô là trung bình xác suất cỏ của các điểm ảnh trong ô '
+    'Ruộng được chia thành ô vuông. **Lượng cỏ dự đoán** của ô là tỉ lệ điểm ảnh trong ô mà mô hình xếp vào lớp cỏ '
     '(ước lượng % diện tích ô là cỏ). Lượng này được so với **hai ngưỡng conformal**, tính trên *các vị trí khác* của '
     'ruộng sao cho bỏ sót không quá α và phun nhầm không quá β: '
     f'trên ngưỡng phun thì {ui.decision_badge(C.SPRAY)}, dưới ngưỡng không phun thì {ui.decision_badge(C.NO_SPRAY)}, '
@@ -105,7 +102,9 @@ def flag(rate, limit):
 rows = []
 for name in C.POLICIES:
     r = m.loc[name]
-    rows.append({'Cách quyết định': C.POLICY_VI[name].replace('τ', tau_text(tau)),
+    policy = ('Phun khi mô hình thấy cỏ trong ô' if name == 'plug_in' and tau == C.ANY_WEED
+              else C.POLICY_VI[name].replace('τ', tau_text(tau)))
+    rows.append({'Cách quyết định': policy,
                  'Giảm diện tích phun': ui.pct(r['spray_reduction']),
                  'Ô CHƯA CHẮC': f'{ui.pct(r["deferred"])} ({int(r["n_deferred"])} ô)',
                  'Bỏ sót': f'{ui.pct(r["missed_need_rate"])} ({int(r["n_missed"])}/{n_need} ô)'

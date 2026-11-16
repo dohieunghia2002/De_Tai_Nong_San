@@ -170,8 +170,8 @@ ui.figure('segmentation_views', rgb, true3, pred3, p_weed, width='stretch' if tr
 m1, m2, m3 = st.columns(3)
 m1.metric('Thời gian chạy mô hình', f'{ui.num(seconds, 1)} giây', border=True, help='Lần chạy đầu tiên cho ô ảnh này; '
           'kết quả được giữ lại nên lần sau hiện ngay.')
-m2.metric('Diện tích cỏ dự đoán', ui.pct(float(p_weed.mean()), 2), border=True,
-          help='Trung bình xác suất cỏ trên cả ô ảnh.')
+m2.metric('Diện tích cỏ dự đoán', ui.pct(float(C.predicted_weed(probs[1], p_weed).mean()), 2), border=True,
+          help='Tỉ lệ điểm ảnh của cả ô ảnh mà mô hình xếp vào lớp cỏ.')
 if true3 is not None:
     iou = C.iou_per_class(pred3, true3)
     m3.metric('IoU cỏ trên ô ảnh này', ui.iou_text(iou[2]), border=True,
@@ -195,11 +195,12 @@ no_thr, sp_thr = min(thr['lam_lo'], thr['lam_hi']), max(thr['lam_lo'], thr['lam_
 where = ('các ô ảnh kiểm tra ở **phần vị trí còn lại** của ruộng (đúng như cách tính trong báo cáo)'
          if thr['how'] == 'crossfit' else 'toàn bộ ô của tập kiểm tra, 3 đợt bay trước ngày phun thuốc')
 st.markdown(
-    f'Lượng cỏ dự đoán của mỗi ô = trung bình xác suất cỏ trong ô. **Ngưỡng phun {ui.num(sp_thr * CELL_CM2, 1)} cm²**, '
+    f'Lượng cỏ dự đoán của mỗi ô = tỉ lệ điểm ảnh trong ô mà mô hình xếp vào lớp cỏ. **Ngưỡng phun '
+    f'{ui.num(sp_thr * CELL_CM2, 1)} cm²**, '
     f'**ngưỡng không phun {ui.num(no_thr * CELL_CM2, 1)} cm²** (trên ô {ui.num(CELL_CM2)} cm²), tính bằng conformal trên '
     f'{where}: {thr["n_need"]} ô cần phun và {thr["n_no_need"]} ô không cần phun, để bỏ sót không quá '
-    f'{ui.pct(C.ALPHA, 0)} và phun nhầm không quá {ui.pct(C.BETA, 0)}. Ô "cần phun" là ô có cỏ từ {ui.pct(TAU, 0)} '
-    'diện tích trở lên (ngưỡng minh họa).')
+    f'{ui.pct(C.ALPHA, 0)} và phun nhầm không quá {ui.pct(C.BETA, 0)}. Ô "cần phun" là ô có cỏ từ {ui.tau_text(TAU)} '
+    'diện tích trở lên (trong khoảng ngưỡng kinh tế của Longchamps và cộng sự, 2014).')
 if split is None:
     # an upload that is not a dataset tile: the conformal guarantee needs cells like the calibration cells
     st.caption(':material/warning: Ảnh này không thuộc WeedsGalore: hai mức trên chỉ được bảo đảm cho ảnh cùng kiểu với '
@@ -350,7 +351,7 @@ def check_message(res, how):
 
 if decision != C.NO_SPRAY:
     st.subheader('Kiểm chứng lời giải thích bằng mô hình')
-    st.markdown('Ước lượng nhanh chỉ trừ phần xác suất cỏ của các vùng bị bỏ. Muốn chắc, **xóa thật** các vùng đó khỏi '
+    st.markdown('Ước lượng nhanh chỉ trừ số điểm ảnh cỏ của các vùng bị bỏ. Muốn chắc, **xóa thật** các vùng đó khỏi '
                 'ảnh (thay bằng đất trống) rồi cho mô hình chấm lại từng bước.')
     if checked is not None:
         if np.isfinite([k_not_v, k_no_v]).all():

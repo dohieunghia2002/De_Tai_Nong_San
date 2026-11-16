@@ -21,12 +21,12 @@ for _p in (ROOT_DIR / 'scripts', ROOT_DIR):
 
 import make_counterfactual_figure as CF  # noqa: E402  (inputs and drawing helpers of the explanation figure)
 from export_weeds_images import CLASSES, B, G, NIR, R, band_limits, composite, date_vi  # noqa: E402,F401
-from src.weeds.analyze import (ALPHA, BETA, CAL_TEST_2FOLD, CAL_VAL, CRITERIA, PRIMARY, SCOPES,  # noqa: E402,F401
+from src.weeds.analyze import (ALPHA, BETA, CAL_TEST_2FOLD, CAL_VAL, CRITERIA, PRIMARY, SCOPES, TAUS,  # noqa: E402,F401
                                test_location_folds)
 from src.weeds.counterfactual import GSD_CM, PATCH  # noqa: E402,F401
 from src.weeds.data import (BANDS, DATES, PRE_HERBICIDE_DATES, ROOT, SEMANTIC_CLASSES, SPLITS, TILE,  # noqa: E402,F401
                             location_blocks, read_png, read_tile, split_ids, tile_date, to_3class)
-from src.weeds.decision import (DEFER, NO_SPRAY, SPRAY, cell_table, crossfit_decisions,  # noqa: E402,F401
+from src.weeds.decision import (ANY_WEED, DEFER, NO_SPRAY, SPRAY, cell_table, crossfit_decisions,  # noqa: E402,F401
                                 evaluate_crossfit, evaluate_policies, policy_decisions, predicted_weed)
 
 ZIP = Path(os.environ.get('WEEDSGALORE_ZIP', ROOT_DIR / 'data/weedsgalore/weedsgalore-dataset.zip'))

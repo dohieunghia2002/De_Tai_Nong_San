@@ -11,10 +11,6 @@ import streamlit as st
 import core as C
 import figures as F
 
-SOURCE = ('Dữ liệu: WeedsGalore (Celikkan và cộng sự, IEEE/CVF WACV 2025), giấy phép CC BY 4.0. '
-          'Ngưỡng "cần phun" τ = 1% diện tích ô chỉ là ngưỡng minh họa, chưa có tài liệu làm căn cứ.')
-
-
 # ---------------------------------------------------------------- formatting
 
 def num(v, digits=0):
@@ -27,6 +23,16 @@ def pct(v, digits=1):
     if v is None or (isinstance(v, float) and not math.isfinite(v)):
         return '–'
     return f'{100 * v:.{digits}f}%'.replace('.', ',')
+
+
+def tau_text(v):
+    """A weed-cover threshold tau: in words for ANY_WEED, else a percentage with the digits it needs (0,06%, 1%)."""
+    return 'có cỏ là phun' if v == C.ANY_WEED else f'{100 * v:g}%'.replace('.', ',')
+
+
+SOURCE = ('Dữ liệu: WeedsGalore (Celikkan và cộng sự, IEEE/CVF WACV 2025), giấy phép CC BY 4.0. Ngưỡng "cần phun": cỏ '
+          f'chiếm từ {tau_text(C.PRIMARY["tau"])} diện tích ô, trong khoảng ngưỡng kinh tế của Longchamps và cộng sự '
+          '(Weed Science, 2014).')
 
 
 def iou_text(v, digits=1):

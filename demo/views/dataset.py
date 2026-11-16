@@ -24,7 +24,7 @@ with left:
         '| **Nhãn** | Từng điểm ảnh: nền đất, ngô, và 4 lớp cỏ (dền, cỏ lồng vực, cúc dại, cỏ khác). Đề tài gộp các '
         'loài cỏ thành một lớp "cỏ dại", như bài báo gốc |\n'
         '| **Nhãn "cần phun"** | Không có sẵn: suy ra từ nhãn, một ô cần phun nếu cỏ chiếm từ τ diện tích ô trở lên '
-        '(τ = 1%, chỉ minh họa) |')
+        f'(τ = {ui.tau_text(C.PRIMARY["tau"])}, trong khoảng ngưỡng kinh tế của Longchamps và cộng sự, 2014) |')
 with right:
     ids = ui.dataset_ids()
     split_vi = {'train': 'Huấn luyện (train)', 'val': 'Chọn mô hình (val)', 'test': 'Kiểm tra (test)'}

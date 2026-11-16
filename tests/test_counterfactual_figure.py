@@ -103,6 +103,29 @@ def test_simple_lines():
     assert 'ô thực ra không cần phun' in truth
 
 
+def test_text_when_no_removal_gives_no_spray():
+    # a SPRAY cell that leaves SPRAY at one patch but never reaches NO_SPRAY (k_no_spray_model is NaN)
+    c = cell_row(SPRAY, 0.016, 1, float('nan'))
+    steps = steps_for([0.016, 0.011, 0.012], [SPRAY, DEFER, DEFER], [0.016, 0.010, 0.007])
+    assert 'bỏ hết các vùng của ô vẫn chưa thành KHÔNG PHUN' in F.text_lines('short', c, steps, 0.0)[1]
+    assert 'bỏ hết các vùng vẫn chưa thành KHÔNG PHUN' in F.simple_lines(c, steps)[1]
+    assert F.k_or_all(float('nan')) == (F.CELL // F.PATCH) ** 2 and F.k_or_all(3.0) == 3
+    assert F.tau_words(0.001) == '0,1%' and F.tau_words(0.0006) == '0,06%' and F.tau_words(0.01) == '1%'
+
+
+def test_check_example_tolerates_a_few_pixels_between_two_gpu_runs():
+    w = np.zeros((200, 200), bool)
+    w[:10, :10] = True  # 100 weed pixels in the saved map
+    c = {'tile': 't', 'cell': 0, 's_model': 100 / 40000, 'patches': '0 1', 'patches_local': '0 1'}
+    assert F.check_example(c, w) == 0
+    # another GPU run sees 2 pixels more: allowed, and then the rankings may differ
+    assert F.check_example({**c, 's_model': 102 / 40000, 'patches_local': '1 0'}, w) == -2
+    with pytest.raises(ValueError):
+        F.check_example({**c, 's_model': 103 / 40000}, w)       # more than PIXEL_TOL
+    with pytest.raises(ValueError):
+        F.check_example({**c, 'patches_local': '1 0'}, w)       # the same pixels, but another ranking
+
+
 def test_patch_boxes_are_inside_the_cell():
     # cell 4 = row 1, column 1 of the 3 x 3 grid; its first patch row is 10 and first patch column 10 of 30
     c = {'cell': 4, 'patches': f'{10 * 30 + 10} {19 * 30 + 19} {12 * 30 + 15}'}

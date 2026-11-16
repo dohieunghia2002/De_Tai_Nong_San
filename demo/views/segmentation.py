@@ -9,8 +9,8 @@ import ui
 
 ui.need_data()
 st.title('2. Tìm cỏ trên ảnh (phân vùng)')
-st.markdown('Mạng học sâu **DeepLabv3+** gán cho mỗi điểm ảnh một trong ba lớp: nền đất, ngô, cỏ dại. Đầu ra dùng cho '
-            'bước sau là **xác suất cỏ** của từng điểm ảnh. Mô hình chính của đề tài là mô hình **tác giả bộ dữ liệu '
+st.markdown('Mạng học sâu **DeepLabv3+** gán cho mỗi điểm ảnh một trong ba lớp: nền đất, ngô, cỏ dại. Bước sau dùng '
+            '**các điểm ảnh mà mô hình xếp vào lớp cỏ** (lớp có xác suất cao nhất). Mô hình chính của đề tài là mô hình **tác giả bộ dữ liệu '
             'đã công bố**; các lần đề tài tự huấn luyện dùng để kiểm tra khả năng tái hiện. mIoU là trung bình IoU '
             '(độ trùng giữa vùng dự đoán và vùng thật) của các lớp, tính bằng %.')
 

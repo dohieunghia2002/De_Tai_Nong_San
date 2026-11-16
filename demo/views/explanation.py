@@ -23,7 +23,8 @@ st.markdown(
     'ghi ở đây **đã được kiểm chứng**: xóa đúng các vùng đó khỏi ảnh (thay bằng đất trống) rồi cho mô hình chấm lại '
     '(chạy trên Colab).\n'
     '3. **Dải phổ nào quan trọng**: Integrated Gradients (IG; Sundararajan và cộng sự, ICML 2017) so với ảnh đất trống.\n\n'
-    'Có cho mô hình chính và thiết lập chính của báo cáo (ô 50 cm, τ = 1%, α = β = 10%).')
+    f'Có cho mô hình chính và thiết lập chính của báo cáo (ô {ui.num(CELL * C.GSD_CM)} cm, τ = '
+    f'{ui.tau_text(C.PRIMARY["tau"])}, α = {ui.pct(C.ALPHA, 0)}, β = {ui.pct(C.BETA, 0)}).')
 
 cells, steps = ui.explanation_cells()
 ns = ui.no_spray_cells()
@@ -95,16 +96,21 @@ else:
     st_steps = steps[(steps['tile'] == tile_id) & (steps['cell'] == cell_idx)].sort_values('k')
     lines = CF.text_lines(None, row, st_steps, row['add_to_spray_cm2'])
     st.markdown('\n'.join(f'- {line}' for line in lines))
-    k_no = int(row['k_no_spray_model'])
-    k_solid = int(row['k_not_spray_model']) if decision == C.SPRAY else 0
+    k_no = CF.k_or_all(row['k_no_spray_model'])  # every patch, when the model never gives NO_SPRAY
+    k_solid = CF.k_or_all(row['k_not_spray_model']) if decision == C.SPRAY else 0
     ui.figure('cell_panels', ui.rgb(tile_id), true3, p_weed[t], row, colour, k_solid, k_no)
     st.caption('Viền liền: các vùng cần bỏ để ô hết PHUN; viền đứt: các vùng bỏ thêm để ô thành KHÔNG PHUN. Các vùng '
                'được bỏ lần lượt, vùng nhiều cỏ dự đoán nhất trước (số đánh trên hình là thứ tự này). Số vùng là số mô '
                'hình đã kiểm chứng theo thứ tự đó, không phải số vùng ít nhất có thể.')
     try:
-        CF.check_example(row, C.predicted_weed(p_crop[t][sl], p_cell))  # the cell's weed pixels: the score s
-        st.caption(':material/check_circle: Bản đồ xác suất đã lưu cho đúng điểm số của lần chạy trên Colab, và thứ tự '
-                   'vùng trên Colab trùng với thứ tự tính trên máy này.')
+        diff = CF.check_example(row, C.predicted_weed(p_crop[t][sl], p_cell))  # the cell's weed pixels: the score s
+        if diff == 0:
+            st.caption(':material/check_circle: Bản đồ đã lưu cho đúng số điểm ảnh cỏ của lần chạy kiểm chứng trên '
+                       'Colab, và thứ tự vùng trên Colab trùng với thứ tự tính trên máy này.')
+        else:
+            st.caption(f':material/info: Bản đồ đã lưu (một lần chạy mô hình khác) thấy lệch {abs(diff)} điểm ảnh cỏ '
+                       'so với lần chạy kiểm chứng trên Colab, như vẫn có giữa hai lần chạy trên GPU; số liệu ở đây là '
+                       'của Colab.')
     except ValueError as e:
         st.error(f'Dữ liệu không nhất quán: {e}')
     ui.figure('removal_curve', row, st_steps, width='content')

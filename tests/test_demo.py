@@ -138,3 +138,19 @@ def test_every_page_runs():
     at.session_state['dec_tau'] = 0.015          # a setting that is not saved: the page must say so
     at.run()
     assert not at.exception and any('Đang khám phá' in w.value for w in at.warning)
+    at.session_state['dec_tau'] = C.ANY_WEED     # "spray any weed": a reported level; the plug-in rule in words
+    at.run()
+    assert not at.exception and not at.error
+    assert any('Phun khi mô hình thấy cỏ trong ô' in df.value.to_string() for df in at.dataframe)
+    # the explanation of a SPRAY cell that no removal takes to NO_SPRAY (the model never gives it)
+    cc = pd.read_csv(C.RESULTS / 'weeds_cfcheck/cfcheck_cells.csv')
+    never = cc[(cc['decision_rescored'] == C.SPRAY) & cc['k_no_spray_model'].isna()]
+    if len(never):
+        at.switch_page('views/explanation.py')
+        at.run()
+        next(b for b in at.button_group if b.label == 'Chọn ô').set_value('pick').run()
+        pool = cc[cc['decision_rescored'] == C.SPRAY].sort_values(['date', 'tile', 'cell']).reset_index(drop=True)
+        j = int(pool.index[(pool['tile'] == never.iloc[0]['tile']) & (pool['cell'] == never.iloc[0]['cell'])][0])
+        next(s for s in at.selectbox if s.label.startswith('Ô (')).set_value(j).run()
+        assert not at.exception and not at.error, ([e.message for e in at.exception], [e.value for e in at.error])
+        assert any('bỏ hết các vùng của ô vẫn chưa thành KHÔNG PHUN' in m.value for m in at.markdown)

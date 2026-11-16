@@ -266,9 +266,9 @@ def main():
     d.text((MARGIN, y), f'Minh họa trên ô ảnh {args.tile} (tập test, bay ngày {date_vi(args.tile)}) với '
                         f'{model_label(run)}, mIoU test {num(miou)}%. Ngưỡng conformal hiệu chỉnh trên các vị trí test '
                         f'khác, α = {g(ALPHA)}, β = {g(BETA)}.', font=f_note, fill=GREY)
-    d.text((MARGIN, y + 24), f'Ô cần phun nếu cỏ dại chiếm từ {g(100 * PRIMARY["tau"])}% diện tích ô (ngưỡng minh '
-                             'họa, chưa có nguồn). Dữ liệu: WeedsGalore (Celikkan và cộng sự, WACV 2025), giấy phép '
-                             'CC BY 4.0.', font=f_note, fill=GREY)
+    d.text((MARGIN, y + 24), f'Ô cần phun nếu cỏ dại chiếm từ {g(100 * PRIMARY["tau"])}% diện tích ô (Longchamps và '
+                             'cộng sự, Weed Science 2014). Dữ liệu: WeedsGalore (Celikkan và cộng sự, WACV 2025), giấy '
+                             'phép CC BY 4.0.', font=f_note, fill=GREY)
     out = Path(args.out)
     img.save(out)
     print(f'saved {out} ({out.stat().st_size / 1e6:.1f} MB); decisions on {args.tile}:',

@@ -22,7 +22,7 @@ st.markdown(
 summary = ui.read_json('weeds_xai/xai_summary.json')
 faith = summary['faithfulness']
 METHODS = {'integrated_gradients': ('Theo IG', '#2a78d6', 'lời giải thích'),
-           'predicted_weed': ('Theo xác suất cỏ (mốc)', '#eb6834', 'lời giải thích'),
+           'predicted_weed': ('Theo điểm ảnh cỏ của mô hình (mốc)', '#eb6834', 'lời giải thích'),
            'grad_cam': ('Theo Grad-CAM', '#1baf7a', 'lời giải thích'),
            'random_cell': ('Ngẫu nhiên trong ô', '#898781', 'đối chứng ngẫu nhiên'),
            'random_tile': ('Ngẫu nhiên cả ô ảnh', '#c3c2b7', 'đối chứng ngẫu nhiên')}
@@ -86,8 +86,9 @@ st.markdown(
     f'- **Grad-CAM không dùng được để giải thích từng ô:** so từng ô, nó chỉ hơn xóa ngẫu nhiên trong ô ở '
     f'{ui.pct(gc.loc[0.01, "beats_cell"], 0) if 0.01 in gc.index else "–"} số ô (xóa {n9 if not one.empty else "–"} '
     'vùng), gần như tung đồng xu.\n'
-    '- **IG không hơn mốc "xác suất cỏ của mô hình"**: điều này dễ hiểu, vì lượng cỏ dự đoán chính là trung bình xác '
-    'suất cỏ trong ô. IG có thêm: chia đóng góp theo dải phổ, và tổng đóng góp bằng đúng lượng cỏ dự đoán so với đất '
+    '- **IG không hơn mốc "điểm ảnh cỏ của mô hình"**: điều này dễ hiểu, vì lượng cỏ dự đoán chính là tỉ lệ điểm ảnh '
+    'mà mô hình xếp vào lớp cỏ, nên xóa đúng các điểm ảnh đó làm nó giảm nhanh nhất. IG có thêm: chia đóng góp theo dải '
+    'phổ, và tổng đóng góp bằng đúng xác suất cỏ trung bình của ô (đại lượng trơn đi cùng lượng cỏ dự đoán) so với đất '
     'trống.\n'
     f'- Ở mức xóa lớn nhất ({int(df["patches"].max())} vùng), "ngẫu nhiên trong ô" gần như xóa cả ô nên so sánh không '
     'còn ý nghĩa.')
@@ -146,7 +147,7 @@ within1 = int(hist.loc[hist['gap'].abs() <= 1, 'cells'].sum())
 sp = cc[cc['decision'] == C.SPRAY]
 de = cc[cc['decision'] == C.DEFER]
 st.markdown(
-    f'"Bỏ k vùng này thì ô hết PHUN" có hai cách tính: **ước lượng nhanh** chỉ trừ phần xác suất cỏ của các vùng bị bỏ '
+    f'"Bỏ k vùng này thì ô hết PHUN" có hai cách tính: **ước lượng nhanh** chỉ trừ số điểm ảnh cỏ của các vùng bị bỏ '
     f'(không chạy lại mô hình), và **mô hình chấm lại** sau khi xóa thật các vùng đó khỏi ảnh (Colab, '
     f'{ui.num(cfs["seconds_per_cell"], 2)} giây mỗi ô trên GPU T4). Trên {k["compared"]} ô PHUN:')
 a, b = st.columns([3, 2])
@@ -162,15 +163,16 @@ with b:
     st.metric('Ước lượng đúng chính xác', f'{k["exact"]}/{k["compared"]} ô', border=True)
     st.metric('Lệch không quá 1 vùng', f'{within1}/{k["compared"]} ô ({ui.pct(within1 / k["compared"], 0)})', border=True)
 st.markdown(
-    f'- Ước lượng nhanh **thường hơi lạc quan** (cột dương: mô hình cần bỏ nhiều vùng hơn), vì xóa một vùng cũng làm '
-    'mô hình nhìn khác các vùng xung quanh. Vì vậy lời giải thích đưa vào báo cáo dùng **số đã được mô hình kiểm chứng**.\n'
+    f'- Ước lượng nhanh **lệch theo cả hai phía**: mô hình cần bỏ nhiều vùng hơn ở {k["estimate_too_small"]} ô (cột '
+    f'dương), ít hơn ở {k["estimate_too_large"]} ô, vì xóa một vùng cũng làm mô hình nhìn khác các vùng xung quanh. Vì '
+    'vậy lời giải thích đưa vào báo cáo dùng **số đã được mô hình kiểm chứng**.\n'
     f'- **Quyết định mong manh là có thật:** mô hình xác nhận {int((sp["k_not_spray_model"] <= 1).sum())} ô PHUN hết '
     f'phun chỉ khi bỏ 1 vùng (ước lượng: {int((sp["k_not_spray_estimate"] <= 1).sum())} ô); '
     f'{int((sp["k_not_spray_model"] <= 2).sum())} ô với tối đa 2 vùng (ước lượng '
     f'{int((sp["k_not_spray_estimate"] <= 2).sum())}).\n'
     f'- **{len(de)} ô CHƯA CHẮC:** bỏ ' + ', '.join(
-        f'{kk} vùng ({n} ô)' for kk, n in de['k_no_spray_model'].astype(int).value_counts().sort_index().items())
+        f'{kk} vùng ({n} ô)' for kk, n in de['k_no_spray_model'].dropna().astype(int).value_counts().sort_index().items())
     + ' là thành KHÔNG PHUN, nên người kiểm tra biết ngay nên xem chỗ nào trước. Đó là chỗ xem trước, không thay cho '
       'việc xem cả ô, vì cỏ mà mô hình bỏ sót có thể nằm ở chỗ khác.')
-st.caption('Nguồn: `results/weeds_cfcheck/cfcheck_summary.json`, `cfcheck_cells.csv` (Colab ngày 10/11/2026).')
+st.caption('Nguồn: `results/weeds_cfcheck/cfcheck_summary.json`, `cfcheck_cells.csv` (chạy trên Colab).')
 ui.footer()

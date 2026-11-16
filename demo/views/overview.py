@@ -28,7 +28,7 @@ go = ui.read_json(f'{C.MODELS[main]["dir"]}/go_no_go.json')
 st.subheader('Kết quả chính hiện tại')
 st.caption(f'Mô hình phân vùng công bố của tác giả (ảnh 5 dải phổ); {n} ô 50 cm × 50 cm của tập kiểm tra, thuộc 3 đợt '
            f'bay trước ngày phun thuốc; {n_need} ô thật sự cần phun theo nhãn (cỏ chiếm từ '
-           f'{ui.pct(s["tau"], 0)} diện tích ô). Giới hạn đặt ra: bỏ sót và phun nhầm không quá '
+           f'{ui.tau_text(s["tau"])} diện tích ô). Giới hạn đặt ra: bỏ sót và phun nhầm không quá '
            f'{ui.pct(s["alpha"], 0)}.')
 c1, c2, c3, c4 = st.columns(4)
 c1.metric('Giảm diện tích phun', ui.pct(cf['spray_reduction']), border=True,
@@ -83,11 +83,13 @@ for k, ch in go['checks'].items():
     sign = {'>=': '≥', '<=': '≤'}.get(op, op)
     miou = k == 'C1_test_miou'
     rows.append({'Tiêu chí': names.get(k, k), 'Kết quả': ui.num(v, 2) if miou else ui.pct(v),
-                 'Yêu cầu': f'{sign} {ui.num(float(bound), 2) if miou else ui.pct(float(bound), 0)}',
+                 'Yêu cầu': f'{sign} {ui.num(float(bound), 2) if miou else ui.pct(float(bound), 1 if k.startswith("C2") else 0)}',
                  'Đạt': '✅ đạt' if ch['pass'] else '❌ chưa đạt'})
 st.dataframe(rows, hide_index=True)
 st.caption(f'Kết luận: **{go["verdict"]}** (nguồn: `results/{C.MODELS[main]["dir"]}/go_no_go.json`). C1 yêu cầu '
-           'mIoU không thấp hơn số của bài báo quá 5 điểm.')
+           'mIoU không thấp hơn số của bài báo quá 5 điểm. C2 yêu cầu giảm ít nhất '
+           f'{ui.pct(go["info"]["c2_share_of_oracle_min"], 0)} mức giảm tối đa có thể, tức mức giảm khi biết trước ô nào '
+           f'cần phun ({ui.pct(go["info"]["oracle_spray_reduction"])}).')
 
 st.subheader('Tiến độ')
 done, todo = st.columns(2, border=True)
@@ -105,13 +107,13 @@ with done:
         f'{ui.num(own.mean(), 2)}%. Số của bài báo nằm trong khoảng này.\n'
         '- Tầng quyết định PHUN / KHÔNG PHUN / CHƯA CHẮC với ngưỡng conformal, thử trên mô hình của tác giả và mọi '
         'mô hình tự huấn luyện.\n'
+        f'- Ngưỡng "cần phun" τ = {ui.tau_text(C.PRIMARY["tau"])} diện tích ô, trong khoảng ngưỡng kinh tế mà chuyên gia '
+        f'đặt trên ảnh (Longchamps và cộng sự, Weed Science 2014); có kết quả cho {len(C.TAUS)} mức τ (trang 3).\n'
         '- Giải thích từng quyết định: Integrated Gradients, Grad-CAM, giải thích phản thực.\n'
         '- Kiểm chứng độ trung thực của lời giải thích bằng cách xóa vùng rồi cho mô hình chấm lại (Colab).')
 with todo:
     st.markdown('**Chưa làm / cần thầy góp ý**')
     st.markdown(
-        '- Ngưỡng "cần phun" (hiện cỏ chiếm 1% diện tích ô) **chỉ để minh họa**: cần ngưỡng có căn cứ từ tài liệu về '
-        'cỏ dại.\n'
         '- Kích thước ô 50 cm chưa có căn cứ: nên khớp với vùng mà máy phun điều khiển riêng được.\n'
         '- Chờ thầy xác nhận: cỏ dại có được tính là dịch hại không; dữ liệu một ruộng, một mùa vụ có đủ không; dữ '
         'liệu công bố ở hội nghị (WACV 2025) có được chấp nhận không.\n'
