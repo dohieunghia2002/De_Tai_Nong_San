@@ -1,1 +1,1 @@
-{"version": 2, "ckpt": "dlv3p_msi_3.pth", "steps": 32, "patch": 20, "draws": 10, "seed": 0, "amp": true, "primary": {"cell_size": 200, "tau": 0.001, "policy": "conformal_3way", "scope": "pre-herbicide pooled", "calibration": "test 2-fold by location"}}
+{"version": 3, "ckpt": "dlv3p_msi_3.pth", "steps": 32, "patch": 20, "draws": 10, "seed": 0, "amp": true, "primary": {"cell_size": 200, "tau": 0.001, "policy": "conformal_3way", "scope": "pre-herbicide pooled", "calibration": "test 2-fold by location", "score": "argmax"}}

@@ -23,6 +23,11 @@ import pandas as pd
 NO_SPRAY, SPRAY, DEFER = 0, 1, 2
 _EPS = 1e-9  # guards floor/ceil against floating-point error in alpha * (n + 1)
 ANY_WEED = 0.0  # tau meaning "spray any weed": a cell needs spraying as soon as one of its pixels is weed
+# Scores and thresholds are shares of a cell's pixels, multiples of 1 / cell^2 (2.5e-5 for 200 px cells): two of them
+# are equal or at least that far apart. Equal ones can still reach a comparison with different rounding errors (a
+# score minus the pixels of removed patches, a threshold read back from a csv file), so the decision rules treat values
+# closer than TIE as equal; no two different shares are that close.
+TIE = 1e-9
 
 
 def needs_spray(w, tau):
@@ -82,8 +87,8 @@ def upper_threshold(neg_scores, beta):
 
 def decide_conformal(s, lam_lo, lam_hi):
     s = np.asarray(s, dtype=float)
-    need_possible = s >= lam_lo
-    no_need_possible = s <= lam_hi
+    need_possible = s >= np.asarray(lam_lo, dtype=float) - TIE  # equal up to rounding is equal (TIE)
+    no_need_possible = s <= np.asarray(lam_hi, dtype=float) + TIE
     d = np.full(s.shape, DEFER)
     d[need_possible & ~no_need_possible] = SPRAY
     d[~need_possible & no_need_possible] = NO_SPRAY
@@ -91,7 +96,7 @@ def decide_conformal(s, lam_lo, lam_hi):
 
 
 def decide_threshold(s, t):
-    return np.where(np.asarray(s, dtype=float) >= t, SPRAY, NO_SPRAY)
+    return np.where(np.asarray(s, dtype=float) >= np.asarray(t, dtype=float) - TIE, SPRAY, NO_SPRAY)
 
 
 def decision_metrics(d, need, w, crop):

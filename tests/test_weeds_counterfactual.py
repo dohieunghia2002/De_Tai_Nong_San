@@ -104,6 +104,21 @@ def test_missing_tile_is_an_error():
         counterfactual_table(['2023-05-30_0002'], p, t, CELL, PATCH)
 
 
+def test_a_removal_that_lands_exactly_on_a_threshold_follows_the_rule():
+    """A 200 px cell with 60 weed pixels, 41 of them in its largest patch: removing that patch leaves 19 pixels,
+    exactly lam_lo, so the cell stays SPRAY (s >= lam_lo) and the second removal ends it. 60/N - 41/N falls below 19/N
+    in floating point, which ended SPRAY one patch early."""
+    cell, n = 200, 40000  # shares are pixel counts / n, as decision.cell_table computes them
+    w = np.zeros((1, cell, cell))
+    w[0, 0:20, 0:2] = 1   # patch (0, 0) of the 20 px grid: 40 pixels ...
+    w[0, 0, 2] = 1        # ... and one more: 41
+    w[0, 0:19, 20] = 1    # patch (0, 1): 19 pixels
+    t = pd.DataFrame({'tile': [TILE], 'date': [TILE[:10]], 'cell': [0], 's': [60 / n], 'lam_lo': [19 / n],
+                      'lam_hi': [10 / n], 'decision': [SPRAY]})
+    out = counterfactual_table([TILE], w, t, cell, 20).iloc[0]
+    assert out['k_not_spray'] == 2 and out['k_no_spray'] == 2
+
+
 def test_compare_with_deletion():
     p, t = small_case()
     table = counterfactual_table([TILE], p, t, CELL, PATCH, gsd_cm=1.0)

@@ -113,6 +113,17 @@ def test_decide_conformal_regions():
     assert list(decide_threshold(s, 0.4)) == [NO_SPRAY, SPRAY, SPRAY]
 
 
+def test_a_score_equal_to_a_threshold_up_to_rounding_is_equal():
+    """Scores and thresholds are shares of pixels; a score that reaches a threshold along another float path (a cell's
+    weed pixels minus those of removed patches) must still compare as equal to it, on both sides."""
+    n = 40000  # pixels of a 200 px cell; shares are pixel counts / n, as cell_table computes them
+    low, high = 60 / n - 41 / n, 20 / n - 3 / n  # 19 and 17 pixels, but rounding put them below / above
+    assert low < 19 / n and high > 17 / n
+    assert list(decide_conformal([low], lam_lo=19 / n, lam_hi=10 / n)) == [SPRAY]      # s >= lam_lo, s > lam_hi
+    assert list(decide_conformal([high], lam_lo=30 / n, lam_hi=17 / n)) == [NO_SPRAY]  # s < lam_lo, s <= lam_hi
+    assert list(decide_threshold([low], 19 / n)) == [SPRAY]
+
+
 def test_decision_metrics_hand_computed():
     d = np.array([SPRAY, NO_SPRAY, DEFER, DEFER, NO_SPRAY])
     need = np.array([True, True, True, False, False])

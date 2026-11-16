@@ -149,6 +149,24 @@ def test_explain_tile_and_faithfulness(model, tile):
     assert E.faithfulness(pd.DataFrame(), xai) == {}
 
 
+def test_faithfulness_counts_a_tie_as_not_beating_the_control():
+    """s is a share of pixels, so a method's drop can equal the mean drop of a random control exactly. Rounding in
+    the mean must not turn the tie into a win: for these numbers it did, by 5e-20, before the tolerance."""
+    px = 1 / 40000  # one pixel of a 200 px cell
+    rows = [{'method': 'integrated_gradients', 'draw': 0, 's_after': 19 * px},  # 1 pixel removed: a tie
+            {'method': 'grad_cam', 'draw': 0, 's_after': 19 * px},
+            {'method': 'predicted_weed', 'draw': 0, 's_after': 17 * px}]  # 3 pixels removed: beats the controls
+    rows += [{'method': c, 'draw': d, 's_after': (20 if d % 2 == 0 else 18) * px}  # 0 or 2 removed, 1 on average
+             for c in E.CONTROLS for d in range(10)]
+    deletion = pd.DataFrame(rows).assign(tile='t', cell=0, fraction=0.01)
+    cells = pd.DataFrame({'tile': ['t'], 'cell': [0], 's_model': [20 * px], 'lam_lo': [10 * px], 'lam_hi': [5 * px]})
+    res = E.faithfulness(deletion, cells)
+    for ctrl in E.CONTROLS:
+        assert res['integrated_gradients']['0.01'][f'beats_{ctrl}'] == 0
+        assert res['grad_cam']['0.01'][f'beats_{ctrl}'] == 0
+        assert res['predicted_weed']['0.01'][f'beats_{ctrl}'] == 1
+
+
 def test_decision_check():
     t = pd.DataFrame({'decision': [SPRAY, NO_SPRAY, DEFER, NO_SPRAY], 'w': [0.02, 0.0, 0.02, 0.0],
                       'crop': 0.1, 'fold': [0, 0, 1, 1], 'lam_lo': [0.01, 0.01, 0.02, 0.02],

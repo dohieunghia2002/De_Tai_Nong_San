@@ -44,7 +44,8 @@ import torch.nn.functional as F
 from src.weeds.analyze import PRIMARY, clean, primary_decisions, test_location_folds
 from src.weeds.authors import load_checkpoint
 from src.weeds.data import BANDS, load_npz, to_3class
-from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, cell_table, decide_conformal, decision_metrics, needs_spray
+from src.weeds.decision import (DEFER, NO_SPRAY, SPRAY, TIE, cell_table, decide_conformal, decision_metrics,
+                                needs_spray)
 from src.weeds.train import evaluate
 
 XAI_VERSION = 3  # bump when an explanation or the deletion test changes: parts of another version are not merged
@@ -288,7 +289,7 @@ def decision_check(t, expected):
 
 def faithfulness(deletion, cells):
     """Per method and removed fraction: mean relative drop of s, share of cells where the drop beats the mean drop of
-    each random control, and the share of SPRAY cells that are no longer SPRAY. SPRAY is judged on the rescored s
+    each random control (a tie does not count), and the share of SPRAY cells that are no longer SPRAY. SPRAY is judged on the rescored s
     (s_model) with the cell's thresholds, so that a cell sitting on a threshold does not count as flipped by
     rounding alone."""
     if deletion.empty:  # no SPRAY or DEFER cell among those explained
@@ -309,7 +310,9 @@ def faithfulness(deletion, cells):
                    'spray_flip_rate': float(gm[gm['spray_before']]['flipped'].mean())}
             if m in METHODS:
                 for ctrl in CONTROLS:
-                    res[f'beats_{ctrl}'] = float((gm['drop'] > rand[ctrl].loc[gm.index]).mean())
+                    # s is a share of pixels, so a drop can equal the mean drop of the draws exactly (they differ by a
+                    # multiple of 1 / (draws x cell^2)): a tie, up to rounding (decision.TIE), is not a win
+                    res[f'beats_{ctrl}'] = float((gm['drop'] > rand[ctrl].loc[gm.index] + TIE).mean())
             out.setdefault(m, {})[str(f)] = res
     return out
 

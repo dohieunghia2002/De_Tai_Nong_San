@@ -28,7 +28,7 @@ st.markdown(
 cells, steps = ui.explanation_cells()
 ns = ui.no_spray_cells()
 maps = ui.xai_maps()
-ids, _, p_weed = ui.probs(C.MAIN_MODEL, 'test')
+ids, p_crop, p_weed = ui.probs(C.MAIN_MODEL, 'test')
 ids = list(ids)
 masks = ui.masks('test')
 
@@ -73,7 +73,8 @@ else:
 tile_id, cell_idx = row['tile'], int(row['cell'])
 t = ids.index(tile_id)
 r0, col0 = divmod(cell_idx, C.TILE // CELL)
-p_cell = p_weed[t][r0 * CELL:(r0 + 1) * CELL, col0 * CELL:(col0 + 1) * CELL]
+sl = (slice(r0 * CELL, (r0 + 1) * CELL), slice(col0 * CELL, (col0 + 1) * CELL))
+p_cell = p_weed[t][sl]
 true3 = C.to_3class(masks[t])
 colour = C.DECISION_COLOR[decision]
 st.markdown(f'#### {ui.decision_badge(decision)} &nbsp; ô {cell_idx + 1} của ô ảnh {tile_id}, bay ngày '
@@ -101,7 +102,7 @@ else:
                'được bỏ lần lượt, vùng nhiều cỏ dự đoán nhất trước (số đánh trên hình là thứ tự này). Số vùng là số mô '
                'hình đã kiểm chứng theo thứ tự đó, không phải số vùng ít nhất có thể.')
     try:
-        CF.check_example(row, p_cell)
+        CF.check_example(row, C.predicted_weed(p_crop[t][sl], p_cell))  # the cell's weed pixels: the score s
         st.caption(':material/check_circle: Bản đồ xác suất đã lưu cho đúng điểm số của lần chạy trên Colab, và thứ tự '
                    'vùng trên Colab trùng với thứ tự tính trên máy này.')
     except ValueError as e:
