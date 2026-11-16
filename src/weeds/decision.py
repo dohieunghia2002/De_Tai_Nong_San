@@ -135,7 +135,9 @@ def policy_decisions(cal, test, tau, alpha, beta):
     policies = {
         'broadcast': np.full(s.shape, SPRAY),
         'oracle': np.where(need, SPRAY, NO_SPRAY),
-        'plug_in': decide_threshold(s, tau),                 # spray if the predicted weed fraction reaches tau
+        # the predicted weed fraction read as the truth is (needs_spray): it reaches tau, or at tau = ANY_WEED the model
+        # predicts any weed pixel (s >= 0 would spray every cell)
+        'plug_in': np.where(s > 0, SPRAY, NO_SPRAY) if tau == ANY_WEED else decide_threshold(s, tau),
         'conformal_miss_only': decide_threshold(s, lam_lo),  # spray unless 'need' is ruled out (no deferral)
         'conformal_3way': decide_conformal(s, lam_lo, lam_hi),
     }

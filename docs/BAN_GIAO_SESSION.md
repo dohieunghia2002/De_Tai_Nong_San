@@ -285,7 +285,7 @@ Người dùng chạy `colab_weeds_cfcheck.ipynb` (thư mục Drive `cfcheck_aut
   - (a) `explain.faithfulness` tính "thắng đối chứng" khi hòa tùy theo làm tròn. Tính lại trên máy từ csv thì lệch 1/181 ô ở Grad-CAM, mức xóa 0,5%. Nay hòa không tính là thắng. Summary của lần chạy Colab không đổi.
   - (b) `decide_conformal` so điểm trên đường trừ dần vùng bị bỏ với ngưỡng đọc từ csv, nên 7/216 ô có k phản thực lệch một vùng. Nay dùng `decision.TIE` = 1e-9.
   - Kiểm chứng: `decision_metrics.csv` và `go_no_go.json` của 4 thư mục có bản đồ xác suất giống từng byte; phản thực trùng với phép tính đúng tuyệt đối trên lưới điểm ảnh; các test mới bắt được cả hai lỗi trên code cũ.
-- **Chờ người dùng quyết định:** plug-in ở τ = "có cỏ là phun" dùng `s >= 0` nên phun mọi ô, giống phun toàn ruộng. Đúng ra phải là `s > 0`, tức phun khi mô hình thấy ít nhất một điểm ảnh cỏ, như cách định nghĩa "cần phun" ở mức này. Sửa thì đổi các dòng plug-in ở τ = 0 của cả 16 thư mục kết quả; 12 thư mục tự huấn luyện phải chạy lại `colab_weeds_runs_rescore.ipynb`.
+- **Plug-in ở τ = "có cỏ là phun" (sửa 16/11, người dùng đồng ý):** trước đó dùng `s >= 0` nên phun mọi ô, giống phun toàn ruộng; nay phun khi mô hình thấy ít nhất một điểm ảnh cỏ (`s > 0`), như cách định nghĩa "cần phun" ở mức này. Chỉ các dòng plug-in ở τ = 0 đổi; mọi dòng khác và `go_no_go.json` giữ nguyên từng byte. Đã tính lại 4 thư mục có bản đồ xác suất. Ví dụ mô hình 5 dải của tác giả, thiết lập chính: phun 95,8%, giảm 4,2%, bỏ sót 1,9%, phun nhầm 28,6%. 12 thư mục tự huấn luyện chờ chạy lại `colab_weeds_runs_rescore.ipynb` (notebook nay xóa zip cũ trên Drive trước khi tính).
 
 ## 4. Code
 

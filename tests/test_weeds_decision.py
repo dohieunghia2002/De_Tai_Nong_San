@@ -156,6 +156,17 @@ def test_evaluate_policies_perfect_scores():
     assert rows['conformal_3way']['n_cal_need'] == 3 * int(np.sum(w >= 0.01))
 
 
+def test_plug_in_at_any_weed_sprays_the_cells_with_predicted_weed():
+    """At tau = ANY_WEED the plug-in rule reads the predicted fraction as the truth is read: a cell is sprayed when
+    the model predicts at least one weed pixel in it (s > 0), not every cell (s >= 0 holds for all of them)."""
+    px = 1 / 40000
+    test = pd.DataFrame({'w': [0.0, px, 0.0, 3 * px], 's': [0.0, 0.0, px, 3 * px], 'crop': 0.0})
+    plug_in = {r['policy']: r for r in evaluate_policies(test, test, ANY_WEED, 0.1, 0.1)}['plug_in']
+    assert plug_in['sprayed'] == 0.5                          # the cells with s > 0
+    assert plug_in['missed_need_rate'] == 0.5 and plug_in['false_spray_rate'] == 0.5
+    assert list(decide_threshold(test['s'], 2 * px)) == [NO_SPRAY, NO_SPRAY, NO_SPRAY, SPRAY]  # tau > 0: s >= tau
+
+
 def test_location_blocks_from_split_order():
     ids = ['2023-06-15_0735', '2023-06-06_0736', '2023-05-30_0720', '2023-05-25_0750',
            '2023-06-06_0770', '2023-05-30_0750', '2023-05-25_0786']

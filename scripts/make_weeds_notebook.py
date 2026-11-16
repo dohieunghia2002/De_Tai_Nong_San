@@ -492,7 +492,7 @@ write_notebook('colab_weeds_runs.ipynb')
 md(f'''
 # Tính lại quyết định phun của các lần tự huấn luyện (chỉ cần CPU)
 
-Từ ngày 15/11/2026, điểm của một ô lưới là **tỉ lệ điểm ảnh mà mô hình xếp vào lớp cỏ** (trước đó là trung bình xác suất cỏ của ô), và ô "cần phun" khi cỏ chiếm từ {TAU_VI} diện tích ô. Notebook này tính lại `decision_metrics.csv` và `go_no_go.json` của các lần tự huấn luyện (`colab_weeds_runs.ipynb`; mỗi lần có mô hình chọn theo val và mô hình epoch cuối) từ bản đồ xác suất đã lưu trên Drive (`probs_val.npz`, `probs_test.npz`), rồi tổng hợp lại `runs_summary.csv`. Không huấn luyện, không chạy mô hình: chỉ cần **CPU**, vài phút.
+Từ ngày 15/11/2026, điểm của một ô lưới là **tỉ lệ điểm ảnh mà mô hình xếp vào lớp cỏ** (trước đó là trung bình xác suất cỏ của ô), và ô "cần phun" khi cỏ chiếm từ {TAU_VI} diện tích ô. Notebook này tính lại `decision_metrics.csv` và `go_no_go.json` của các lần tự huấn luyện (`colab_weeds_runs.ipynb`; mỗi lần có mô hình chọn theo val và mô hình epoch cuối) từ bản đồ xác suất đã lưu trên Drive (`probs_val.npz`, `probs_test.npz`), rồi tổng hợp lại `runs_summary.csv`. Không huấn luyện, không chạy mô hình: chỉ cần **CPU**, vài phút. Chạy lại ngày 16/11/2026 vì đã sửa chính sách plug-in ở mức "có cỏ là phun": trước đó nó phun mọi ô.
 
 **Cách chạy:** mở notebook bằng **đúng tài khoản Google đã chạy `colab_weeds_runs.ipynb`**, vì bản đồ xác suất nằm trên Drive của tài khoản đó (mục 2 dừng lại nếu Drive thiếu kết quả). Để runtime mặc định (CPU), *Runtime → Run all*. Mục 5 tạo `ket_qua_weeds_runs_argmax.zip` (chỉ có csv và json).
 ''')
@@ -527,6 +527,7 @@ import pandas as pd
 from src.weeds.analyze import write_results
 from src.weeds.runs import summarize
 
+(BASE / 'ket_qua_weeds_runs_argmax.zip').unlink(missing_ok=True)  # an earlier run's zip must not outlive a failed run
 DATA = Path('/content/data')
 DATA.mkdir(exist_ok=True)
 for s in ('val', 'test'):
