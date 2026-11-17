@@ -57,6 +57,65 @@ def test_decisions_equal_saved_results(cell, tau, scope, calibration):
 
 
 @needs_results
+def test_every_tau_of_the_slider_counts_and_decides_as_shown():
+    """Main model, every tau of the decision page's slider, both cell sizes of the saved results and both
+    calibrations: the truth is needs_spray, every count agrees with its rate, every conformal decision follows the two
+    thresholds the page shows (the larger bounds SPRAY, the smaller NO_SPRAY) and the plug-in rule is the page's."""
+    from src.weeds.decision import TIE
+    taus = sorted(set(C.TAUS) | {0.002, 0.015, 0.03, 0.05})  # views/decision.py
+    for cell in (100, 200):
+        t, fold_of = tables(C.MAIN_MODEL, cell)
+        for tau in taus:
+            for cal in (C.CAL_TEST_2FOLD, C.CAL_VAL):
+                cells, metrics, _ = C.decide(t['test'], t['val'], fold_of, tau, C.ALPHA, C.BETA,
+                                             C.SCOPES[C.PRIMARY['scope']], cal)
+                need = C.needs_spray(cells['w'], tau)
+                assert (cells['need'] == need).all(), (cell, tau, cal)
+                m = metrics.set_index('policy')
+                for name in C.POLICIES:
+                    d, r = cells[name].to_numpy(), m.loc[name]
+                    assert r['n_need'] == need.sum() and r['n_missed'] == ((d == C.NO_SPRAY) & need).sum()
+                    assert r['n_false_spray'] == ((d == C.SPRAY) & ~need).sum()
+                    assert math.isclose(r['missed_need_rate'], r['n_missed'] / r['n_need'], abs_tol=1e-12)
+                    if r['n_cells'] > r['n_need']:
+                        assert math.isclose(r['false_spray_rate'], r['n_false_spray'] / (r['n_cells'] - r['n_need']),
+                                            abs_tol=1e-12)
+                s, d = cells['s'].to_numpy(), cells['conformal_3way'].to_numpy()
+                sp_thr = np.maximum(cells['lam_lo'], cells['lam_hi']).to_numpy()
+                no_thr = np.minimum(cells['lam_lo'], cells['lam_hi']).to_numpy()
+                assert (s[d == C.SPRAY] >= sp_thr[d == C.SPRAY] - TIE).all(), (cell, tau, cal)
+                assert (s[d == C.NO_SPRAY] <= no_thr[d == C.NO_SPRAY] + TIE).all(), (cell, tau, cal)
+                plug = np.where(s > 0 if tau == C.ANY_WEED else s >= tau - TIE, C.SPRAY, C.NO_SPRAY)
+                assert (cells['plug_in'].to_numpy() == plug).all(), (cell, tau, cal)
+
+
+@needs_results
+def test_explanation_sentences_agree_with_the_data():
+    """Every cell of the explanation page: each statement of its sentences holds on the data it was made from."""
+    cells, steps = C.explanation_cells()
+    for _, c in cells.iterrows():
+        st = steps[(steps['tile'] == c['tile']) & (steps['cell'] == c['cell'])].sort_values('k')
+        why, what, tail = C.CF.text_lines(None, c, st, c['add_to_spray_cm2'])
+        s, (no_thr, sp_thr) = c['s_model'] * C.cell_cm2(200), C.CF.thresholds_cm2(c)
+        dm = st['decision_model'].to_numpy()
+        if c['decision_rescored'] == C.SPRAY:
+            assert s >= sp_thr - 1e-6 and 'từ ngưỡng phun' in why
+            k = int(np.argmax(dm != C.SPRAY))
+            assert f'bỏ {C.CF.patch_words(k)} (' in what
+            assert (dm[k] == C.NO_SPRAY) == ('chuyển thẳng sang KHÔNG PHUN' in what)
+        else:
+            assert no_thr < s < sp_thr and 'nằm giữa' in why
+            if (dm == C.NO_SPRAY).any():
+                assert f'bỏ {C.CF.patch_words(int(np.argmax(dm == C.NO_SPRAY)))} (' in what
+            assert abs(s + c['add_to_spray_cm2'] - sp_thr) < 0.13  # 2 px: the stored map and the Colab rescore
+        assert bool(C.needs_spray(c['w'], C.PRIMARY['tau'])) == ('ô thực sự cần phun' in tail)
+    for _, r in C.no_spray_cells().iterrows():  # the page's own sentences for NO_SPRAY cells
+        no_thr, sp_thr = C.CF.thresholds_cm2(r)
+        assert r['s'] * C.cell_cm2(200) < no_thr                     # "dưới ngưỡng không phun"
+        assert math.isclose(r['s'] * C.cell_cm2(200) + r['add_to_spray_cm2'], sp_thr, abs_tol=1e-6)
+
+
+@needs_results
 def test_primary_decisions_equal_the_explained_ones():
     """The cells the explanation pages describe (results/weeds_xai/decisions.csv) are the primary decisions."""
     t, fold_of = tables(C.MAIN_MODEL, C.PRIMARY['cell_size'])

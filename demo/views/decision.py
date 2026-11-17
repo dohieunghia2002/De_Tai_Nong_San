@@ -205,7 +205,10 @@ points = alt.Chart(plot).mark_circle(size=60, opacity=0.85, stroke='white', stro
              alt.Tooltip('decision:N', title='quyết định'), alt.Tooltip('outcome:N', title='kết quả'),
              alt.Tooltip('s_pct:Q', title='cỏ dự đoán (%)', format='.2f'),
              alt.Tooltip('w_pct:Q', title='cỏ theo nhãn (%)', format='.2f')])
-tau_rule = alt.Chart(pd.DataFrame({'y': [100 * tau], 'label': ['τ: từ đây trở lên là cần phun']})).mark_rule(
+# at tau = ANY_WEED a cell needs spraying when its weed cover is above 0 (decision.needs_spray), not from 0 upwards
+need_label = ('có cỏ là phun: ô có cỏ theo nhãn (trên 0) là cần phun' if tau == C.ANY_WEED
+              else 'τ: từ đây trở lên là cần phun')
+tau_rule = alt.Chart(pd.DataFrame({'y': [100 * tau], 'label': [need_label]})).mark_rule(
     color='#52514e', strokeDash=[5, 3]).encode(y='y:Q', tooltip=alt.Tooltip('label:N', title=''))
 lam = pd.DataFrame([{'x': 100 * v, 'label': f'{name} ({"phần " + str(i) if len(parts) == 2 else "val"}): '
                                             f'{ui.pct(v, 2)}'}
@@ -217,9 +220,12 @@ if not lam.empty:
     layers.insert(0, alt.Chart(lam).mark_rule(color='#898781', strokeWidth=1).encode(
         x='x:Q', tooltip=alt.Tooltip('label:N', title='')))
 st.altair_chart(alt.layer(*layers).properties(height=420), width='stretch')
+errors_text = ('Chấm xanh (KHÔNG PHUN) nằm phía trên đường ngang là bỏ sót; chấm đỏ (PHUN) nằm ngay trên đường ngang '
+               '(không có cỏ theo nhãn) là phun nhầm.' if tau == C.ANY_WEED else
+               'Chấm xanh (KHÔNG PHUN) nằm trên đường ngang là bỏ sót; chấm đỏ (PHUN) nằm dưới là phun nhầm.')
 st.caption('Mỗi chấm là một ô. Đường ngang đứt: ngưỡng "cần phun" τ (theo nhãn). Đường dọc mảnh: hai ngưỡng conformal '
-           'của từng phần hiệu chỉnh. Chấm xanh (KHÔNG PHUN) nằm trên đường ngang là bỏ sót; chấm đỏ (PHUN) nằm dưới là '
-           'phun nhầm. Trục chia giãn ở gần 0 để thấy rõ các ô ít cỏ. Đưa chuột lên chấm để xem chi tiết.')
+           f'của từng phần hiệu chỉnh. {errors_text} Trục chia giãn ở gần 0 để thấy rõ các ô ít cỏ. Đưa chuột lên chấm '
+           'để xem chi tiết.')
 
 st.subheader('Cùng thiết lập, khác mô hình phân vùng')
 rows = []

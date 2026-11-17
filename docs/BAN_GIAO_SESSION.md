@@ -10,12 +10,24 @@
 - **Demo, 3 hình và báo cáo tiến độ đã cập nhật.** Báo cáo mới là `docs/BAO_CAO_TIEN_DO_16_11.md` (đã review: mọi số đếm lại từ bảng từng ô); bản 11/11 giữ nguyên để đối chiếu.
 - **Phát hiện chính phải trình bày đúng** (CLAUDE.md, mục "Lưu ý"): ở τ = 0,1% với mô hình 5 dải, conformal không hơn plug-in. Ưu điểm của conformal thể hiện ở mô hình RGB và ở τ = 1%.
 - **Git:** mọi thay đổi đã commit và push lên `main`. Thư mục `test_demo/` (ảnh của bộ dữ liệu, dùng để quay demo) cố ý không commit.
-- **Test:** 109 test đạt, kể cả test chậm (`WEEDS_SLOW_TESTS=1`), chạy ngày 16/11 sau mọi thay đổi của phiên.
+- **Test:** 111 test đạt, kể cả test chậm (`WEEDS_SLOW_TESTS=1`), chạy ngày 17/11 sau mọi thay đổi của phiên.
 - **Review lại báo cáo 16/11 và demo (16/11, người dùng yêu cầu):**
   - Mọi số của báo cáo được tính lại từ `results/` bằng một script độc lập; các câu về dữ liệu và bài báo được đối chiếu lại với PDF (Celikkan 2025 tr. 3–4, Celikkan 2023 tr. 1, Melki 2025 tr. 7–10).
   - Sửa báo cáo: tương quan Grad-CAM 0,983 thành 0,965. Số 0,983 là trung vị trên 864 cặp ô; demo, bản 11/11 và mục 5 dùng trung vị trên 24 ô ảnh. Ghi rõ "7 lần với batch 8, không kể lần chạy thử đầu dùng batch 2".
   - Sửa demo: ở τ = "có cỏ là phun", số ô đếm sai (216 ô cần phun thay vì 209, bỏ sót "28 ô" thay vì 21, phun nhầm "0/0 ô"), vì `demo/core.decide` dùng `w >= tau`; tỉ lệ vẫn đúng vì lấy từ `src.weeds`. Nay dùng `decision.needs_spray`, có test cho mức này.
   - Sửa chữ demo: IG chia xác suất cỏ, không phải lượng cỏ dự đoán (trang đầu, trang 5, tiêu đề hình IG); câu "ngưỡng cố định gần đạt mức tốt nhất" thành "cách của đề tài chưa tốt hơn ngưỡng cố định"; danh sách đường huấn luyện bị lặp hai lần chạy thử; vài câu diễn đạt.
+  - **Rà lần 2 (17/11):** đọc chữ và số trên 2 hình của báo cáo; chạy demo ở các trạng thái chưa thử (mô hình khác, từng đợt bay, ô 25 và 37,5 cm, hiệu chỉnh trên val, τ và α khác, ví dụ CHƯA CHẮC và KHÔNG PHUN, ô ngoài tập kiểm tra); kiểm bằng số liệu các câu về ngưỡng (cả 3 bộ ngưỡng ở thiết lập chính đều có λ_hi < λ_lo; không ô nào có điểm bằng đúng ngưỡng).
+    - Báo cáo: không có lỗi mới.
+    - Demo, đã sửa: phần trăm cỏ dự đoán trong lời giải thích ghi 2 chữ số (trước ghi "0,1%" cho 0,095%, trùng ngưỡng τ); chú thích và tooltip của biểu đồ ở τ = 0 (ô phun nhầm nằm ngay trên đường ngang, không ở dưới); "tách 4 loài cỏ" thành "4 lớp cỏ". Hình chi tiết `hinh_giai_thich_phan_thuc.png` vẽ lại vì cùng câu chữ; hình trong báo cáo không đổi.
+    - Giữ nguyên "sát ngưỡng": 11 ô mong manh có lượng cỏ 1,05–2,06 lần ngưỡng phun, trong khi ô PHUN điển hình gấp 11 lần (trung vị); báo cáo định nghĩa "sát ngưỡng" là "mong manh".
+  - **Rà lần 3 (17/11, theo cách ở mục 7):**
+    - Kiểm tự động mọi trạng thái bằng chính các hàm mà trang gọi:
+      - trang 3: 1 809 thiết lập (4 mô hình × 4 cỡ ô × 11 mức τ × 5 phạm vi × 2 cách hiệu chỉnh, cộng 49 cặp α, β), trong đó 505 thiết lập có trong file kết quả và đều khớp;
+      - trang 4: đủ 216 ô;
+      - trang đầu: 468 ô của 52 ô ảnh tập kiểm tra và tập val.
+    - Chạy thêm các nhánh chưa từng chạy: ô ảnh tập huấn luyện; nút cho mô hình chấm lại trên máy.
+    - Kết quả: không còn lỗi.
+    - Thêm 2 test: `test_every_tau_of_the_slider_counts_and_decides_as_shown` và `test_explanation_sentences_agree_with_the_data`. Đưa lại lỗi đếm ở τ = 0 thì test đầu báo lỗi.
 
 **Việc cần làm tiếp, theo thứ tự:**
 1. **Viết bài báo 12–15 trang trên Overleaf** (việc chính, mục 1). Lấy báo cáo 16/11 làm khung số liệu, trình bày đúng phát hiện chính, đối sánh với các nghiên cứu khác (mục 3, 3.1, 3.2).
@@ -688,3 +700,12 @@ Bài học thêm từ phiên 15–16/11:
   - Lần review báo cáo 16/11 nhờ đếm lại từ bảng từng ô mà phát hiện một số đếm sai: 30 ô "quay lại PHUN" thật ra gồm cả 1 ô CHƯA CHẮC.
 - **Trên Windows, heredoc của Bash có thể làm hỏng dấu `\`.** Sửa file bằng công cụ Edit, hoặc viết script Python ra file rồi chạy.
 - **Người dùng muốn làm từng phần và được hỏi khi có quyết định về nội dung**, ví dụ cách viết báo cáo gửi thầy. Khi kết quả đổi câu chuyện thì báo trước, không tự viết lại.
+
+Bài học từ các lần review demo 16–17/11 (người dùng hỏi vì sao lần nào cũng còn lỗi):
+- **Review demo phải phủ hết các trạng thái và kiểm tự động, không xem vài trạng thái bằng mắt.** Hai lượt đầu chỉ xem vài trạng thái nên lần nào cũng thấy lỗi mới, ở các nhánh chưa xem: τ = 0, ô CHƯA CHẮC hoặc KHÔNG PHUN, thiết lập phụ. Một test còn ghi sẵn công thức sai (`w >= tau`).
+  - Cách làm:
+    - liệt kê mọi câu và số hiển thị, cùng điều kiện mà chúng xuất hiện;
+    - kiểm tự động mọi trạng thái bằng chính các hàm mà trang gọi (lượt 3 ở mục 0: 1 809 thiết lập của trang 3, 216 ô của trang 4, 468 ô của trang đầu);
+    - cho mỗi nhánh giao diện chạy ít nhất một lần (Streamlit AppTest);
+    - đưa phép kiểm vào test, rồi thử đưa lại lỗi cũ để chắc test bắt được.
+  - Kiểm cả ý nghĩa của câu trong từng điều kiện, không chỉ con số. Ví dụ "chấm đỏ nằm dưới đường ngang" đúng khi τ > 0 nhưng sai khi τ = 0.

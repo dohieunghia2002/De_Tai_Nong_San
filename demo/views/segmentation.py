@@ -16,7 +16,7 @@ st.markdown('Mạng học sâu **DeepLabv3+** gán cho mỗi điểm ảnh một
 
 st.subheader('Đối sánh với bài báo gốc')
 labels = {'dlv3p_msi_3': '5 dải phổ, 3 lớp (đất / ngô / cỏ)', 'dlv3p_rgb_3': 'Ảnh màu RGB, 3 lớp',
-          'dlv3p_msi_6': '5 dải phổ, 6 lớp (tách 4 loài cỏ)', 'dlv3p_rgb_6': 'Ảnh màu RGB, 6 lớp'}
+          'dlv3p_msi_6': '5 dải phổ, 6 lớp (tách 4 lớp cỏ)', 'dlv3p_rgb_6': 'Ảnh màu RGB, 6 lớp'}
 p = C.authors_vs_paper()
 st.dataframe(pd.DataFrame({
     'Mô hình của tác giả': [labels.get(k, k) for k in p['model']],

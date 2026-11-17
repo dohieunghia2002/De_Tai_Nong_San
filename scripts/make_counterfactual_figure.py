@@ -99,7 +99,7 @@ def text_lines(key, c, steps, add_to_spray_cm2):
     where = (f'từ ngưỡng phun {cm2(sp_thr)} cm² trở lên' if c['decision_rescored'] == SPRAY else
              f'nằm giữa ngưỡng không phun {cm2(no_thr)} cm² và ngưỡng phun {cm2(sp_thr)} cm²')
     why = (f'Vì sao {name}: mô hình thấy khoảng {cm2(weed)} cm² cỏ trong ô 50 cm × 50 cm '
-           f'({num(100 * c["s_model"], 1)}% diện tích), {where}.')
+           f'({num(100 * c["s_model"], 2)}% diện tích), {where}.')  # 2 digits: tau is 0.1 %, thresholds 0.14-0.18 %
     never = not np.isfinite(c['k_no_spray_model'])  # every patch removed, and still not NO_SPRAY
     k_no = k_or_all(c['k_no_spray_model'])
     if c['decision_rescored'] == SPRAY:
@@ -139,8 +139,9 @@ def patch_words(k):
 
 
 def band_cm2(c):
-    """Integrated gradients per band in cm^2 of predicted weed. They add up to s(tile) - s(bare soil), and the
-    bare-soil score is about 0 (results/weeds_xai), so the bands share out the cell's predicted weed area."""
+    """Integrated gradients per band, as cm^2: the cell's mean P(weed) times the cell area. They add up to
+    p(tile) - p(bare soil), and the bare-soil P(weed) is about 0 (results/weeds_xai), so the bands share out the cell's
+    weed probability, the smooth stand-in for its predicted weed area (IG needs a gradient, the pixel count has none)."""
     return {b: c[f'ig_{b}'] * CELL_CM2 for b in BANDS}
 
 
