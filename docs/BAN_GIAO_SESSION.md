@@ -29,11 +29,124 @@
     - Kết quả: không còn lỗi.
     - Thêm 2 test: `test_every_tau_of_the_slider_counts_and_decides_as_shown` và `test_explanation_sentences_agree_with_the_data`. Đưa lại lỗi đếm ở τ = 0 thì test đầu báo lỗi.
 
+- **Bản thảo bài báo (17/11/2026, tiếng Việt):** nằm ở `data/bai_bao/`, không commit vì repo công khai.
+  - Gồm `bai_bao.tex`, `tai_lieu.bib` và `hinh/` (pdfLaTeX + BibTeX, 15 trang), bản PDF `bai_bao.pdf`, và gói để tải lên Overleaf `data/bai_bao_overleaf.zip`.
+  - **Bảng đối chiếu từng khẳng định (18–19/11/2026, người dùng yêu cầu vì lần rà nào cũng thấy lỗi mới):** `.venv/Scripts/python data/bai_bao/kiem_tra.py` (chạy từ thư mục gốc repo, khoảng 15 giây) sinh `data/bai_bao/doi_chieu.md`.
+    - Mỗi câu và mỗi dòng bảng (319 đơn vị sau lần sửa thứ ba ngày 19/11) có mục đối chiếu, kèm bằng chứng:
+      - số ghép từ giá trị tính lại từ `results/`, nên số trong bài lệch là báo lỗi;
+      - dòng mã đặt thiết lập;
+      - câu trích nguyên văn của bài được trích, có kiểm số trong câu trích;
+      - điều kiện tính từ kết quả;
+      - phép tìm từ khóa cho câu "bài X không có ...";
+      - lập luận (68 mục, chủ yếu là câu dẫn ý, cấu trúc bài, tiêu đề cột).
+    - Script báo những câu chưa có mục đối chiếu, những số và trích dẫn chưa có bằng chứng.
+    - Script tính lại các bảng quyết định từ bản đồ xác suất bằng `src/weeds/decision.py`; 145/145 dòng khớp `decision_metrics.csv`.
+    - Script đối chiếu từng trường của 38 mục tài liệu (tên bài, tác giả, nơi đăng, năm, tập, số, trang) với Crossref, OpenAlex, arXiv, PMLR, Semantic Scholar, mục lục kỷ yếu NeurIPS 2017–2019, bản PDF trên trang BMVC 2018 và trang tạp chí Harvard JOLT. Cả 38 mục đều khớp; các sai khác chỉ do phiên bản khác (arXiv, SSRN, bản tạp chí) được ghi lý do trong `BIB_NOTE`.
+    - Đã thử bằng cách cố ý cài 4 lỗi số vào một bản sao của bài: cả 4 bị bắt.
+    - `--en ban_en.tex` so số (theo giá trị), khóa trích dẫn và nhãn của bản tiếng Anh với bản tiếng Việt; dùng khi người dùng dịch.
+    - Nguồn để đối chiếu tải bằng `data/bai_bao/tai_nguon.py` vào `data/bai_bao/nguon/` (toàn văn arXiv và Europe PMC, PDF bài gốc, bản ghi xuất bản). Đọc nguồn bằng `nguon_van_ban.py`, tách câu bằng `cau_trong_bai.py`. Script cũ `so_lieu.py` chỉ in số, không còn là phép kiểm chính.
+  - Người dùng muốn bài viết bằng tiếng Việt; người dùng tự dịch sang tiếng Anh, thầy viết lại khi nộp, nơi nộp chưa chọn.
+  - Các quyết định khi viết (người dùng để Claude tự quyết):
+    - hiệu chỉnh lại theo đợt bay không nhận là đóng góp mà báo cáo là hạn chế;
+    - thêm đối sánh với quy tắc "Weed in set" của Melki 2025, chính là chính sách `conformal_miss_only` có sẵn trong `decision_metrics.csv`. Ở τ = 0,1%: mô hình 5 dải bỏ sót 10,8%, mô hình RGB phun toàn ruộng;
+  - Sửa ngày 18/11 theo yêu cầu người dùng:
+    - đã điền tên tác giả và đơn vị (chỉ có trong file `.tex`);
+    - bài **không có mục Hạn chế**, chỉ có mục 5.5 Hướng phát triển. Hai ý cần minh bạch vẫn giữ trong phần phương pháp: điểm s được chọn sau khi thấy mức nền trên tập kiểm tra (mục 3.3), C2 được viết lại khi đổi τ (chú thích ở mục 3.5);
+    - có bản hình tiếng Anh `hinh/so_do_xu_ly_en.png` và `hinh/giai_thich_phan_thuc_en.png`, vẽ bằng tùy chọn `--lang en` mới của `scripts/make_pipeline_figure.py` (`--run results/weeds_authors/dlv3p_msi_3`) và `scripts/make_counterfactual_figure.py` (chỉ bản chi tiết, không có `--simple`). Bản tiếng Việt của cả ba hình vẽ lại vẫn giống từng byte; 25 test của hai script và demo đạt.
+  - Rà toàn bộ bài và hình ngày 18/11 (người dùng yêu cầu), đã sửa:
+    - **Số làm tròn sai trong hình và demo:** tỉ lệ điểm ảnh có đuôi đúng 5 (0,145%, 0,405%, 0,075%, 0,195%) bị Python làm tròn xuống, vì số thực nhị phân nằm ngay dưới nửa. Đã sửa ngày 18/11:
+      - mọi số hiển thị (hai script vẽ hình, `demo/ui.py`, `demo/figures.py`, nhãn cm² trên đường cong của demo) nay làm tròn nửa lên bằng một hàm chung `fixed_half_up` (`scripts/export_weeds_images.py`); có test cho cả script lẫn demo (đưa lại cách cũ thì test báo lỗi);
+      - đã vẽ lại hình của bài và của báo cáo 16/11 (`so_do_pipeline_tac_gia.png`, `hinh_giai_thich_phan_thuc.png`, `hinh_giai_thich_don_gian.png`), rồi tạo lại `BAO_CAO_TIEN_DO_16_11_co_hinh.md`. Hình sơ đồ và hình chi tiết của báo cáo nay giống từng byte hình trong bài. Bản cũ lưu ở `data/weedsgalore/hinh_bao_cao_16_11_truoc_sua_lam_tron/`;
+      - kiểm tra: 111 test mặc định đạt; 30 test của demo đạt, kể cả hai test chậm mở từng trang (`WEEDS_SLOW_TESTS=1`).
+    - **Câu về bài khác, đối chiếu lại toàn văn:**
+      - Peña 2013 dùng ảnh đa phổ và có đánh giá độ chính xác mức cỏ (86%, 28 khung mẫu);
+      - Huang 2018 dùng ô 0,5 m và có đánh giá độ chính xác bản đồ phun (trên 0,94), nên câu "không đánh giá tỉ lệ sai ở mức quyết định" đã sửa thành "không có cơ chế giới hạn trước tỉ lệ sai";
+      - Allmendinger 2024: vùng phun nhỏ nhất là 1 m × 1 m theo cả hai chiều (béc chồng tia, phun 0,5 m trước và sau cây cỏ), không phải 0,5 m × 1 m;
+      - Celikkan 2023 dùng Sugarbeets2016 và PhenoBench;
+      - bài chỉ dùng lại chỉ số mức giảm phun của Melki, không dùng lượng phun dư.
+    - **Câu chưa chính xác về số liệu hoặc phương pháp:** phần giảm vượt mức tối đa bằng số ô bỏ sót trừ số ô phun nhầm; 22/194 ô cần phun mà mô hình RGB không thấy điểm ảnh cỏ nào (đã thêm vào `so_lieu.py`); điều kiện dừng của phép quét phản thực; đánh giá phân vùng chạy ở cả fp32 lẫn fp16; ở τ ≤ 0,06% là "nhiều ô" (45,4%) chứ không phải "hầu hết" ô CHƯA CHẮC.
+    - Bỏ ý "thử nghiệm ngoài đồng" trong Hướng phát triển (người dùng yêu cầu). Bài 15 trang.
+  - Sửa ngày 18–19/11 khi dựng bảng đối chiếu (mọi câu dưới đây đã có câu trích nguyên văn trong `doi_chieu.md`):
+    - Celikkan 2025: cỏ cạnh tranh "dinh dưỡng, nước và không gian", không phải "ánh sáng".
+    - Câu "nông dân thường phun toàn ruộng, tốn kém, ảnh hưởng môi trường" nay trích Celikkan 2023 (nguồn nói đúng ý này). Christensen 2009 chỉ định nghĩa công nghệ phòng trừ cỏ theo vị trí; câu "chỉ xử lý những chỗ có cỏ" nay trích Peña 2013 và Celikkan 2025.
+    - Câu "WeedsGalore là bộ dữ liệu đầu tiên" viết lại theo đúng câu của tác giả: bộ dữ liệu UAV đa phổ công khai đầu tiên cho theo dõi cỏ dại trên ruộng ngô.
+    - Câu "các nghiên cứu phân vùng dừng ở độ đo điểm ảnh" nay chỉ nêu hai bài đã đọc toàn văn (Celikkan 2023, 2025).
+    - Sa 2018: lập bản đồ trên ảnh ghép (orthomosaic) ruộng củ cải đường; bỏ "trên toàn ruộng".
+    - Longchamps 2014: "tùy mức chấp nhận cỏ của từng chuyên gia" (nguồn: "level of tolerance of the expert adviser"), không phải "mức chấp nhận rủi ro".
+    - Câu "ngưỡng phun quyết định phần lớn lượng thuốc tiết kiệm" thành "là một yếu tố then chốt" (tên bài San Martín 2016), có trích dẫn.
+    - Melki 2025: dữ liệu "không công khai" (nguồn: "proprietary"), không phải "của doanh nghiệp".
+    - Melki 2025: bỏ cặp số 0,45/0,50 của thí nghiệm 2. Dòng "Marginal" của Bảng 5 bài đó tự mâu thuẫn: tỉ lệ phun 0,50 trừ mức nhiễm 0,45 không bằng lượng dư 0,20 in cùng dòng. Chỉ giữ số thí nghiệm 1 (giảm phun 0,60 ở mức nhiễm 0,29; nhất quán: 0,40 − 0,29 = 0,11).
+    - Câu về thí nghiệm trang trại mới của Melki ghi rõ: mô hình và ngưỡng hiệu chỉnh trên dữ liệu cũ, không huấn luyện hay hiệu chỉnh lại.
+    - SEDC tìm "một tập nhỏ" phân đoạn (nguồn: "a small set"), không phải "nhỏ nhất". Fong và Dabkowski tìm vùng nhỏ nhất mà khi xóa thì điểm phân loại giảm mạnh.
+    - Adebayo 2018: một số phương pháp "không phụ thuộc vào cả mô hình lẫn quá trình sinh dữ liệu" (đúng câu tóm tắt).
+    - LayerCAM: chỉ nêu điều tóm tắt nói (xét lại quan hệ giữa bản đồ đặc trưng và gradient để định vị chi tiết hơn). Câu cũ "giữ gradient theo từng vị trí" không có trong nguồn đã tải.
+    - Bỏ "tác giả dùng fp32": bài gốc chỉ nói huấn luyện trên GPU A100.
+    - Danh mục: số trang Fong 2017 thành 3449–3457 (bản ghi IEEE, DOI 10.1109/ICCV.2017.371); DeepLabv3+ thành 833–851 (bản ghi Springer, DOI 10.1007/978-3-030-01234-2_49).
+  - **Lượt rà độc lập ngày 19/11** (một tác tử chỉ đọc, không được mở bảng đối chiếu, tự tính lại từ dữ liệu gốc):
+    - Không thấy số nào sai trong tóm tắt, 5 bảng, mục 4 và hai hình.
+    - Có 15 lỗi về nghĩa mà bảng đối chiếu không bắt được, vì bảng chỉ kiểm câu trích có trong nguồn, không kiểm câu viết lại có đúng nghĩa không. Đã kiểm lại từng phát hiện với nguồn rồi mới sửa:
+      - Popordanoska: hiệu chỉnh trên từng ảnh là điều kiện **đủ, không phải cần** (câu cũ "chỉ ... khi" là sai).
+      - Trình tự được viết đúng: ba tiêu chí đặt trước lần chạy thử cho τ = 1% với C2 cũ "giảm ≥ 30%". τ = 0,1% và C2 mới đặt sau đó. Việc đổi không làm phương pháp có lợi hơn (ở τ = 1% ba mức tốt hơn ngưỡng cố định, ở 0,1% thì không). Bỏ câu "τ chọn theo tài liệu, không theo kết quả" và bỏ chú thích cuối trang.
+      - Chú thích Hình 1 nay nói: ô ảnh minh họa chứa 3 trong 14 ô bỏ sót, và Ô 1 (CHƯA CHẮC) cũng cần phun.
+      - Bảng 1: cả hai bài Celikkan chỉ gợi ý không phun hoặc tránh phun sai khi bất định cao, không chuyển cho người kiểm tra; cột "Chờ người kiểm tra" nay là "Không" cho cả hai.
+      - "Theo các chỉ số của Melki" thành: chỉ mức giảm diện tích phun là chỉ số của Melki.
+      - Béc 0,5 m "thông thường" chỉ dẫn Allmendinger. San Martín dùng 0,5 m trong mô phỏng và tự ghi kích thước đó không phải loại thông dụng.
+      - San Martín: tăng ngưỡng "có thể để lại vùng không được phun", không phải "bỏ sót nhiều hơn" nói chung.
+      - Thêm câu: phép xóa không huấn luyện lại có thể đo cả lệch phân phối (Hooker).
+      - "Nguyên nhân là mô hình nhìn cả ngữ cảnh" thành "có thể do …, hoặc do ô đất trống tạo tín hiệu mới (Dabkowski)".
+      - **Số trường hợp vượt 10% nay tính trên cả 14 mô hình × 7 mức τ = 98 trường hợp** (trước chỉ 4 mô hình, 28 trường hợp): ngưỡng cố định 56, Weed in set 46, ba mức 15. Ba mức vượt nhiều nhất 12,5%: 14 trường hợp bỏ sót 10,05–12,44% và 1 trường hợp phun nhầm.
+      - Phép thay từng dải đo trên s (cột `ablate_*`, lưu sẵn mức giảm) xếp RE đầu ở 104/181 ô, NIR 47; đã báo cáo cạnh con số 167/181 của IG.
+      - "Hơn α × 194 = 19,4 đúng một ô" thành "hơn 19 ô (số lớn nhất trong giới hạn) đúng một ô".
+      - 4,5 điểm phần trăm là do 22 ô để đánh giá, không do tập hiệu chỉnh 9 và 13 ô.
+      - "Tái hiện độc lập" thành "kiểm chứng mã đánh giá bằng trọng số tác giả và tự huấn luyện lại".
+      - Ghi "ở fp32" cho mức lệch dưới 0,005.
+      - Chú thích Hình 2 nói rõ ví dụ chọn trong 150/181 ô không đổi ngược quyết định.
+    - Còn để trống: đường dẫn mã nguồn.
+    - Sau khi sửa: `kiem_tra.py` sạch (314 câu, 316 mục, 0 lỗi), bài 15 trang, gói Overleaf đã tạo lại.
+  - **Lượt rà độc lập thứ hai ngày 19/11** (tác tử mới, chỉ đọc, tập trung vào nghĩa của câu):
+    - Không có lỗi sai sự thật: diễn giải nguồn, mô tả phương pháp và các câu về quy trình đều khớp nguồn, mã và lịch sử git.
+    - Có 4 lỗi gây hiểu nhầm. Đã kiểm lại số liệu của từng lỗi với file kết quả rồi mới sửa:
+      - So sánh 15/98 với 56/98 chưa nêu giá phải trả. Nay ghi thêm ở tóm tắt, mục 4.3, 5.1 và kết luận: hệ thống chuyển hơn 30% số ô cho người kiểm tra ở 31/98 trường hợp, 28 trong số đó ở τ ≤ 0,06%; ở τ = 0 trung vị là 88%.
+      - Mục 5.3 nói cỡ mẫu nhỏ làm bảo đảm conformal thành gần đúng, điều này sai: bảo đảm vẫn đúng theo kỳ vọng, cỡ mẫu nhỏ chỉ làm một lần hiệu chỉnh dao động mạnh.
+      - Câu "không cộng dồn" viết như đã đo. Nay ghi đúng điều quan sát được: bỏ một vùng không làm s giảm đúng bằng số điểm ảnh cỏ của vùng. Lý do k không tối thiểu: thứ tự xếp theo điểm ảnh cỏ dự đoán, không theo tác động thật. Ba trong bốn ô "bỏ hết 100 vùng" có s giảm đều; cả bốn kết thúc ở CHƯA CHẮC, còn 2,19–3,69 cm² cỏ dự đoán; nay tách thành câu riêng.
+      - "IG trung thực" nay ghi là IG hơn đối chứng ngẫu nhiên trong phép xóa vùng nhưng không hơn mốc điểm ảnh cỏ. Thông tin dải phổ của từng ô chưa kiểm chứng: dải đứng đầu theo IG chỉ trùng với phép thay từng dải ở 105/181 ô.
+    - Đã sửa các điểm nhỏ:
+      - Kết luận: "khi mô hình lệch về phía phát hiện thiếu cỏ" thay cho "khi mô hình yếu hơn". Mô hình batch 8 có mIoU thấp hơn RGB nhưng không được lợi.
+      - Ghi rõ kết quả ở τ = 0,1% (điểm s cũ) đã có từ lần chạy thử: danh sách τ ban đầu ở commit 812cb14 là (0,001; 0,005; 0,01; 0,02).
+      - Lịch 100 epoch của tác giả cho 79,60–81,74%.
+      - 31/181 ô có quyết định đổi ngược.
+      - Chú thích Hình 2 ghi "kèm nhãn thật".
+      - Nêu cách xác định 8 vị trí (thứ tự trong file chia tập, kiểm tra bằng mắt).
+      - Longchamps: chuyên gia quyết định từng ảnh, ngưỡng do tác giả suy ra.
+      - San Martín: kết quả "qua mô phỏng".
+      - Barber: độ hụt bị chặn theo mức lệch.
+      - Adebayo và Hooker được diễn đạt lại để không hàm ý Grad-CAM thất bại theo hai bài này.
+      - Phía "thêm cỏ" không được kiểm chứng bằng mô hình.
+    - Chân Hình 1 và Hình 2 nay ghi "trong khoảng 0,06–0,31% của Longchamps và cộng sự, 2014". Đã sửa chữ trong `scripts/make_pipeline_figure.py` và `scripts/make_counterfactual_figure.py` (bản chi tiết, cả tiếng Việt lẫn tiếng Anh). 28 test của hai script và demo đạt. Đã vẽ lại 4 hình của bài. Hình của báo cáo 16/11 trong `data/weedsgalore/` chưa vẽ lại, vẫn mang chữ cũ; bản gọn `--simple` (`SIMPLE_NOTES`) chưa sửa.
+    - Bài dài thêm khoảng 25 dòng nên lên 16 trang. Đã đưa về 15 trang bằng cách thu gọn khoảng cách quanh đề mục (`titlesec` tùy chọn `compact`), giữa các mục tài liệu tham khảo và quanh bảng, hình; nội dung giữ nguyên.
+    - Sau khi sửa: `kiem_tra.py` sạch (316 câu, 318 mục, 0 lỗi), gói Overleaf đã tạo lại.
+  - **Lượt rà có trọng tâm ngày 19/11** (tác tử mới, chỉ đọc 17 đoạn vừa viết lại và chân các hình):
+    - Không có lỗi sai sự thật; mọi số tính lại đúng.
+    - Có một lỗi gây hiểu nhầm, đã sửa: cơ chế "mức nền" ở mục 3.3. Tính lại từ bản đồ đã lưu, trên 7 ô không có cỏ, 90% mức nền nằm ở 76–481 điểm ảnh, còn các xác suất dưới 0,01 chỉ góp 3–20%. Câu cũ "xác suất rất nhỏ trên 40.000 điểm ảnh cộng lại" sai.
+    - Các điểm nhỏ đã sửa:
+      - tóm tắt ghi "trong ô";
+      - câu Adebayo/Hooker không còn đọc như Grad-CAM thuộc nhóm thất bại; Hooker đánh giá bằng huấn luyện lại;
+      - "được chúng tôi mở rộng cho ô CHƯA CHẮC";
+      - "100 epoch cố định như mã công bố của tác giả" (README mã tác giả, đã tải vào `data/bai_bao/nguon/github_readme_weedsgalore.md`);
+      - mục 4.1 ghi rõ là các mô hình chọn theo val;
+      - mục 3.3 nói rõ cả hai thay đổi (τ chính và điểm s) đều làm sau khi có kết quả. Với điểm cũ, lúc chuyển ngưỡng, ngưỡng cố định ở τ = 0,1% phun nhầm 13,6% (git a18280d); lợi thế này của quy tắc ba mức mất đi khi đổi cách tính điểm;
+      - mục 4.3 thêm: 7/15 trường hợp vượt giới hạn nằm trong nhóm 31 trường hợp chưa chắc trên 30%;
+      - mục 4.5: "không nhất thiết làm s giảm đúng bằng", "vùng đất trống";
+      - mục 4.6 và 5.1 ghi "λ_c = +∞, không ô nào được PHUN" thay cho "không đủ để đặt ngưỡng phun";
+      - mục 5.1: 51/56 ô bị ngưỡng cố định bỏ sót thành CHƯA CHẮC, 5/56 thành PHUN;
+      - mục 5.3 viết lại câu về bảo đảm cho khỏi tự mâu thuẫn.
+    - Sau khi sửa: `kiem_tra.py` sạch (319 câu, 321 mục, 0 lỗi), bài 15 trang, gói Overleaf đã tạo lại. `kiem_tra.py` đọc kết quả điểm cũ từ git (`git show a18280d:...`), nên phải chạy trong repo git.
+
 **Việc cần làm tiếp, theo thứ tự:**
-1. **Viết bài báo 12–15 trang trên Overleaf** (việc chính, mục 1). Lấy báo cáo 16/11 làm khung số liệu, trình bày đúng phát hiện chính, đối sánh với các nghiên cứu khác (mục 3, 3.1, 3.2).
+1. **Bài báo:** người dùng đọc `data/bai_bao/bai_bao.pdf`, rồi tải `data/bai_bao_overleaf.zip` lên Overleaf (New Project → Upload Project). Còn để trống: đường dẫn mã nguồn. Chữ trong Hình 2 nhỏ. Khi dịch sang tiếng Anh, đổi tên file hình sang bản `_en` (có ghi chú cạnh lệnh chèn hình), rồi chạy `kiem_tra.py --en` trên bản dịch. **Mỗi lần sửa chữ trong `bai_bao.tex` phải chạy lại `kiem_tra.py`**; câu mới hoặc câu đổi nghĩa thì thêm hay sửa mục đối chiếu trong hàm `ledger`.
 2. **Nếu người dùng cần, xuất báo cáo 16/11 ra PDF** từ bản có hình `data/weedsgalore/BAO_CAO_TIEN_DO_16_11_co_hinh.md`. Lần trước xuất bằng marked.js và trình duyệt Edge chạy ẩn; hỏi người dùng trước khi chạy Edge.
 3. **Chờ thầy trả lời** ba điểm ở mục 1, ý 4.
-4. **Nếu bài báo cần dẫn chặt:** đọc toàn văn Longchamps 2014 (mới đọc tóm tắt), Ali 2015 và Nikolić 2025 (mục 3.2).
+4. **Nếu bài báo cần dẫn chặt:** các câu về Longchamps 2014, Christensen 2009, Zhai 2020, Chow 1970, LayerCAM, Lei 2018, Angelopoulos 2023 và vài bài XAI chỉ dựa trên tóm tắt (bảng đối chiếu ghi rõ nguồn của từng câu trích). Nên đọc toàn văn các bài này, cùng Ali 2015 và Nikolić 2025 (mục 3.2).
 
 **Lưu ý kỹ thuật (16/11):**
 - **Nhãn "cần phun":** mọi chỗ xác định ô có cần phun không phải dùng `decision.needs_spray(w, tau)`. Ở τ = 0 ("có cỏ là phun") nó là `w > 0`; viết `w >= tau` thì ô nào cũng thành cần phun.
@@ -105,7 +218,7 @@ PDF bài WACV 2025 tải ngày 05/11/2026 từ CVF Open Access: `docs/Celikkan_2
 - **Celikkan và cộng sự 2025 (bài gốc WeedsGalore):** độ bất định bằng MC dropout, đo ECE. Chỉ **gợi ý** hệ thống "không phun khi độ bất định cao", không xây dựng thành quy tắc quyết định.
 - **Celikkan và cộng sự 2023 (ICCVW):** bản đồ độ bất định cho phân vùng cỏ và cây trồng. Không có quy tắc quyết định, không dùng conformal.
 - **Melki và cộng sự 2025 (bản thảo arXiv):**
-  - Dữ liệu riêng của công ty: ảnh RGB chụp từ máy phun mặt đất, không phải UAV.
+  - Dữ liệu riêng của công ty (EXXACT Robotics): 510.600 ảnh RGB 224 × 224 từ 21 trang trại; mỗi ảnh được giả định ứng với vùng phun của một béc. Bài không nói ảnh được chụp bằng thiết bị gì. (Sửa ngày 17/11: trước đây file này ghi "chụp từ máy phun mặt đất", là suy đoán, không có trong bài.)
   - Phân loại ảnh, conformal theo lớp, chỉ có quyết định **phun hoặc không phun**.
   - Không hiệu chỉnh lại khi gặp trang trại mới, không có trạng thái "chưa quyết", không có XAI.
   - Bài có định nghĩa sẵn các chỉ số "sprayed ratio", "spray reduction" và "spray surplus"; đề tài có thể dùng lại và trích dẫn.

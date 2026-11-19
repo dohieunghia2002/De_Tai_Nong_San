@@ -14,15 +14,17 @@ import figures as F
 # ---------------------------------------------------------------- formatting
 
 def num(v, digits=0):
+    """v with `digits` decimals, halves rounded up (0,145 -> 0,15; core.fixed_half_up), thousands spaced."""
     if v is None or (isinstance(v, float) and not math.isfinite(v)):
         return '–'
-    return f'{v:,.{digits}f}'.replace(',', ' ').replace('.', ',')
+    return C.fixed_half_up(v, digits, grouping=True).replace(',', ' ').replace('.', ',')
 
 
 def pct(v, digits=1):
+    """A share as a percentage with `digits` decimals, halves rounded up (0,195 % -> 0,20 %)."""
     if v is None or (isinstance(v, float) and not math.isfinite(v)):
         return '–'
-    return f'{100 * v:.{digits}f}%'.replace('.', ',')
+    return f'{C.fixed_half_up(100 * v, digits)}%'.replace('.', ',')
 
 
 def tau_text(v):

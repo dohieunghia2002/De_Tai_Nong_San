@@ -37,3 +37,9 @@ def test_explanation_with_too_few_calibration_cells():
 def test_same_treats_missing_values_alike():
     assert F.same(float('nan'), None) and F.same(0.1, 0.1 + 1e-12)
     assert not F.same(0.1, None) and not F.same(0.1, 0.2)
+
+
+def test_pct_rounds_halves_up():
+    # shares of 40 000 pixels whose percentage ends in 5: Python's own rounding gave 0,14 %, 0,40 % and 0,07 %
+    assert F.pct(58 / 40000) == '0,15' and F.pct(162 / 40000) == '0,41' and F.pct(30 / 40000) == '0,08'
+    assert F.pct(70 / 40000) == '0,18' and F.pct(0.0089) == '0,89'

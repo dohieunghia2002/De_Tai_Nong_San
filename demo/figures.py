@@ -210,7 +210,8 @@ def tile_decisions(rgb, rows, policy, cell, tau, title):
 
 
 def pct(v, digits=1):
-    return f'{100 * v:.{digits}f}%'.replace('.', ',')
+    """As ui.pct: halves rounded up (0,195 % -> 0,20 %)."""
+    return f'{C.fixed_half_up(100 * v, digits)}%'.replace('.', ',')
 
 
 # ---------------------------------------------------------------- explanations

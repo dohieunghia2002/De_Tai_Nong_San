@@ -8,6 +8,7 @@ comparable. Labels in the images are in Vietnamese (the audience); fonts come fr
 import argparse
 import sys
 import zipfile
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 import numpy as np
@@ -60,9 +61,28 @@ def font(size, bold=False):
     return ImageFont.truetype(FONT_BOLD if bold else FONT, size)
 
 
+def fixed_half_up(v, digits=0, grouping=False):
+    """v as text with `digits` decimals and a decimal point, halves rounded up as people round them (0.145 -> '0.15').
+    Cell shares are whole pixels over 40 000; as binary floats many of their halves (0.145, 0.405, 0.075, 0.195 %) lie
+    just below the half, and Python's own formatting rounds them down. Rounding first to 10 decimals removes that
+    error. grouping: thousands separated by commas, as format(v, ',f'). Shared by the figure scripts and the demo."""
+    d = Decimal(f'{v:.10f}').quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP)
+    return f'{d:,f}' if grouping else f'{d:f}'
+
+
 def date_vi(tile_id):
     y, m, d = tile_id[:10].split('-')
     return f'{d}/{m}/{y}'
+
+
+MONTHS_EN = ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
+             'November', 'December')
+
+
+def date_en(tile_id, year=True):
+    """The acquisition date of a tile id in English: '25 May 2023' (or '25 May')."""
+    y, m, d = tile_id[:10].split('-')
+    return f'{int(d)} {MONTHS_EN[int(m) - 1]}' + (f' {y}' if year else '')
 
 
 def band_limits(zf, ids):

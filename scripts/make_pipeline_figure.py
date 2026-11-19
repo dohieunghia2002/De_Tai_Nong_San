@@ -1,9 +1,10 @@
 """Draw the pipeline figure of the decision support system on one real test tile: multispectral input, predicted
 segmentation (output 1) and per-cell spray decisions (output 2), with example explanations. Decisions are recomputed
 as in src.weeds.analyze for the primary setting (2-fold cross-fit by location on the pre-herbicide test tiles) and
-checked against the run's go_no_go.json before drawing. Text in the figure is Vietnamese (the audience).
+checked against the run's go_no_go.json before drawing. Text in the figure is Vietnamese (the audience); --lang en
+draws the English version (English text, decimal points), for the English version of the paper.
 
-  python scripts/make_pipeline_figure.py [--run results/weeds_pilot_b8] [--tile 2023-05-30_0720]
+  python scripts/make_pipeline_figure.py [--run results/weeds_pilot_b8] [--tile 2023-05-30_0720] [--lang en]
 """
 import argparse
 import json
@@ -17,7 +18,8 @@ from PIL import Image, ImageDraw
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT_DIR), str(ROOT_DIR / 'scripts')]
-from export_weeds_images import B, G, R, band_limits, composite, date_vi, font  # noqa: E402
+from export_weeds_images import (B, G, R, band_limits, composite, date_en, date_vi, fixed_half_up,  # noqa: E402
+                                 font)
 from src.weeds.analyze import ALPHA, BETA, PRIMARY, primary_decisions, test_location_folds  # noqa: E402
 from src.weeds.data import BANDS, SPLITS, TILE, load_split, split_ids, to_3class  # noqa: E402
 from src.weeds.decision import DEFER, NO_SPRAY, SPRAY, cell_table, decision_metrics, needs_spray  # noqa: E402
@@ -31,10 +33,28 @@ IMG, GAP_X, MARGIN = 440, 270, 40
 COLS = [MARGIN + i * (IMG + GAP_X) for i in range(3)]
 W, H = COLS[-1] + IMG + MARGIN, 1100
 Y_TAG, Y_TITLE, Y_IMG = 92, 128, 210
+LANG = 'vi'  # 'en' with --lang en (set_language)
+
+
+def T(vi, en):
+    """The text in the figure's language."""
+    return en if LANG == 'en' else vi
+
+
+def set_language(lang):
+    """Switch the figure's text to `lang` ('vi' or 'en'); main() calls it once, before drawing."""
+    global LANG
+    LANG = lang
+    if lang == 'en':
+        SEG[:] = [('soil', SEG[0][1]), ('maize', SEG[1][1]), ('weed', SEG[2][1])]
+        DECISION.update({SPRAY: ('SPRAY', DECISION[SPRAY][1]), NO_SPRAY: ('NO SPRAY', DECISION[NO_SPRAY][1]),
+                         DEFER: ('DEFER', DECISION[DEFER][1])})
 
 
 def num(v, digits=2):
-    return f'{v:.{digits}f}'.replace('.', ',')
+    """v with `digits` decimals, halves rounded up (export_weeds_images.fixed_half_up: 0,145 -> 0,15)."""
+    s = fixed_half_up(v, digits)
+    return s if LANG == 'en' else s.replace('.', ',')
 
 
 def pct(v):
@@ -82,8 +102,10 @@ def arrow(d, x0, x1, y):
 
 
 def step_box(d, cx, bottom, lines, half_width):
-    """Processing step drawn just above its arrow, so the arrow stays fully visible."""
+    """Processing step drawn just above its arrow, so the arrow stays fully visible; widened when a line is longer."""
     f_b, f = font(21, True), font(18)
+    longest = max(d.textlength(line, font=f_b if i == 0 else f) for i, line in enumerate(lines))
+    half_width = max(half_width, math.ceil(longest / 2) + 12)
     h = 34 + 26 * (len(lines) - 1) + 16
     d.rounded_rectangle([cx - half_width, bottom - h, cx + half_width, bottom], radius=14, fill=(236, 241, 246),
                         outline=TAG, width=3)
@@ -143,7 +165,8 @@ def decision_map(rgb, cells, cell_px):
         d.text((k * cell_px + 12, r * cell_px + 8), str(int(c['cell']) + 1), font=font(30, True), fill='white',
                stroke_width=3, stroke_fill='black')
         # one word per line, so 'KHÔNG PHUN' and 'CHƯA CHẮC' fit inside a cell
-        lines = [(w, font(31, True)) for w in DECISION[c['decision']][0].split()] + [(f'cỏ {pct(c["s"])}%', font(27))]
+        lines = [(w, font(31, True)) for w in DECISION[c['decision']][0].split()] + [
+            (f'{T("cỏ", "weed")} {pct(c["s"])}%', font(27))]
         cx, y = (k + 0.5) * cell_px, (r + 0.5) * cell_px - 36 * len(lines) / 2 + 10
         for text, f in lines:
             centred(d, cx, y, text, f, fill='white', stroke_width=3, stroke_fill='black')
@@ -158,30 +181,39 @@ def explanation(c):
     and lam_hi +inf when calibration has too few cells; such a threshold never decides, so it only appears for DEFER."""
     lo, hi, s, d = c['lam_lo'], c['lam_hi'], c['s'], c['decision']
     crossed = hi < lo
-    head = f'Ô {int(c["cell"]) + 1}, {DECISION[d][0]}: cỏ dại dự đoán chiếm {pct(s)}% diện tích ô'
+    n = int(c['cell']) + 1
+    head = T(f'Ô {n}, {DECISION[d][0]}: cỏ dại dự đoán chiếm {pct(s)}% diện tích ô',
+             f'Cell {n}, {DECISION[d][0]}: predicted weed covers {pct(s)}% of the cell')
     if d == SPRAY:
-        return f'{head}, từ ngưỡng phun {pct(lo)}% trở lên.' if crossed else f'{head}, vượt ngưỡng phun {pct(hi)}%.'
+        return (T(f'{head}, từ ngưỡng phun {pct(lo)}% trở lên.', f'{head}, at or above the spray threshold of {pct(lo)}%.')
+                if crossed else T(f'{head}, vượt ngưỡng phun {pct(hi)}%.', f'{head}, above the spray threshold of {pct(hi)}%.'))
     if d == NO_SPRAY:
-        return (f'{head}, không vượt ngưỡng không phun {pct(hi)}%.' if crossed
-                else f'{head}, dưới ngưỡng không phun {pct(lo)}%.')
+        return (T(f'{head}, không vượt ngưỡng không phun {pct(hi)}%.',
+                  f'{head}, not above the no-spray threshold of {pct(hi)}%.') if crossed
+                else T(f'{head}, dưới ngưỡng không phun {pct(lo)}%.', f'{head}, below the no-spray threshold of {pct(lo)}%.'))
     if not (math.isfinite(lo) and math.isfinite(hi)):
-        missing = ' và '.join(n for n, v in (('không phun', lo), ('phun', hi)) if not math.isfinite(v))
-        return f'{head}; phần hiệu chỉnh có quá ít ô để đặt ngưỡng {missing}: cần người ra kiểm tra.'
+        missing = T(' và ', ' and ').join(name for name, v in ((T('không phun', 'no-spray'), lo), (T('phun', 'spray'), hi))
+                                          if not math.isfinite(v))
+        return T(f'{head}; phần hiệu chỉnh có quá ít ô để đặt ngưỡng {missing}: cần người ra kiểm tra.',
+                 f'{head}; too few calibration cells to set the {missing} threshold: a person should check the cell.')
     no_spray, spray = min(lo, hi), max(lo, hi)
-    return (f'{head}, nằm giữa ngưỡng không phun {pct(no_spray)}% và ngưỡng phun {pct(spray)}%: '
-            f'cần người ra kiểm tra.')
+    return T(f'{head}, nằm giữa ngưỡng không phun {pct(no_spray)}% và ngưỡng phun {pct(spray)}%: cần người ra kiểm tra.',
+             f'{head}, between the no-spray threshold of {pct(no_spray)}% and the spray threshold of {pct(spray)}%: '
+             'a person should check the cell.')
 
 
 def model_label(run):
     done = run / 'train_done.json'
     if done.exists():
         cfg = json.loads(done.read_text())
-        return f'mô hình đề tài tự huấn luyện (batch {cfg.get("batch", "?")}, seed {cfg.get("seed", "?")})'
-    return f'mô hình công bố của tác giả ({run.name})'
+        b, s = cfg.get('batch', '?'), cfg.get('seed', '?')
+        return T(f'mô hình đề tài tự huấn luyện (batch {b}, seed {s})', f'our own trained model (batch {b}, seed {s})')
+    return T(f'mô hình công bố của tác giả ({run.name})', f"the authors' published model ({run.name})")
 
 
 def g(v):
-    return f'{v:g}'.replace('.', ',')
+    s = f'{v:g}'
+    return s if LANG == 'en' else s.replace('.', ',')
 
 
 def pick_tile(t):
@@ -196,7 +228,9 @@ def main():
     ap.add_argument('--run', default=str(ROOT_DIR / 'results/weeds_pilot_b8'))
     ap.add_argument('--tile', default=None, help='default: pick_tile, the rule above')
     ap.add_argument('--out', default=str(ROOT_DIR / 'data/weedsgalore/so_do_pipeline.png'))
+    ap.add_argument('--lang', choices=('vi', 'en'), default='vi', help='language of the text in the figure')
     args = ap.parse_args()
+    set_language(args.lang)
     run = Path(args.run)
     test, p_crop, p_weed, t = decisions(args.zip, run)
     args.tile = args.tile or pick_tile(t)
@@ -217,7 +251,8 @@ def main():
 
     img = Image.new('RGB', (W, H), 'white')
     d = ImageDraw.Draw(img)
-    d.text((MARGIN, 26), 'Hệ thống hỗ trợ ra quyết định phun thuốc trừ cỏ từ ảnh UAV đa phổ: sơ đồ xử lý',
+    d.text((MARGIN, 26), T('Hệ thống hỗ trợ ra quyết định phun thuốc trừ cỏ từ ảnh UAV đa phổ: sơ đồ xử lý',
+                           'Decision support system for herbicide spraying from multispectral UAV images: pipeline'),
            font=font(34, True), fill=DARK)
 
     # input: the RGB composite in front of four offset layers standing for the other bands
@@ -229,23 +264,31 @@ def main():
     img.paste(seg.resize((IMG, IMG), Image.LANCZOS), (COLS[1], Y_IMG))
     img.paste(dmap.resize((IMG, IMG), Image.LANCZOS), (COLS[2], Y_IMG))
 
-    header(d, COLS[0], 'INPUT', 'Ảnh drone đa phổ', '')
-    header(d, COLS[1], 'OUTPUT 1', 'Kết quả phân vùng', '(segmentation)')
-    header(d, COLS[2], 'OUTPUT 2', 'Kết quả phân lớp từng ô', '(classification)')
+    header(d, COLS[0], 'INPUT', T('Ảnh drone đa phổ', 'Multispectral drone image'), '')
+    header(d, COLS[1], 'OUTPUT 1', T('Kết quả phân vùng', 'Segmentation'), T('(segmentation)', '(per pixel)'))
+    header(d, COLS[2], 'OUTPUT 2', T('Kết quả phân lớp từng ô', 'Decision per cell'), '(classification)')
     mid = Y_IMG + IMG / 2
     arrow(d, COLS[0] + IMG + 52, COLS[1] - 12, mid)
     arrow(d, COLS[1] + IMG + 12, COLS[2] - 12, mid)
-    step_box(d, (COLS[0] + IMG + 40 + COLS[1]) / 2, mid - 18, ['Mô hình học sâu', 'DeepLabv3+', 'phân vùng ảnh'], 100)
+    step_box(d, (COLS[0] + IMG + 40 + COLS[1]) / 2, mid - 18,
+             T(['Mô hình học sâu', 'DeepLabv3+', 'phân vùng ảnh'], ['Deep learning', 'DeepLabv3+', 'segmentation']),
+             100)
     step_box(d, (COLS[1] + IMG + COLS[2]) / 2, mid - 18,
-             ['Mô-đun quyết định', f'chia ô {g(cell_m)} m × {g(cell_m)} m,', 'so % cỏ dự đoán', 'với ngưỡng conformal'],
+             T(['Mô-đun quyết định', f'chia ô {g(cell_m)} m × {g(cell_m)} m,', 'so % cỏ dự đoán', 'với ngưỡng conformal'],
+               ['Decision module', f'{g(cell_m)} m × {g(cell_m)} m cells:', 'predicted weed %', 'vs. conformal thresholds']),
              115)
 
     y_cap = Y_IMG + IMG + 18
-    captions(d, COLS[0], y_cap, [f'{len(BANDS)} dải phổ: {", ".join(BANDS)} (ảnh 16 bit)',
-                                 f'{TILE} × {TILE} điểm ảnh ≈ {g(tile_m)} m × {g(tile_m)} m'])
-    captions(d, COLS[1], y_cap, ['Mỗi điểm ảnh: nền đất / ngô / cỏ dại, kèm', 'xác suất → bản đồ vị trí cỏ dại'])
-    captions(d, COLS[2], y_cap, [f'Mỗi ô {g(cell_m)} m × {g(cell_m)} m: phun / không phun /',
-                                 'chưa chắc → bản đồ phun cho cả ruộng'])
+    captions(d, COLS[0], y_cap, [T(f'{len(BANDS)} dải phổ: {", ".join(BANDS)} (ảnh 16 bit)',
+                                   f'{len(BANDS)} bands: {", ".join(BANDS)} (16-bit image)'),
+                                 T(f'{TILE} × {TILE} điểm ảnh ≈ {g(tile_m)} m × {g(tile_m)} m',
+                                   f'{TILE} × {TILE} pixels ≈ {g(tile_m)} m × {g(tile_m)} m')])
+    captions(d, COLS[1], y_cap, T(['Mỗi điểm ảnh: nền đất / ngô / cỏ dại, kèm', 'xác suất → bản đồ vị trí cỏ dại'],
+                                  ['Each pixel: soil / maize / weed, with its', 'probability → map of weed locations']))
+    captions(d, COLS[2], y_cap, T([f'Mỗi ô {g(cell_m)} m × {g(cell_m)} m: phun / không phun /',
+                                   'chưa chắc → bản đồ phun cho cả ruộng'],
+                                  [f'Each {g(cell_m)} m × {g(cell_m)} m cell: spray / no spray /',
+                                   'defer → spray map of the whole field']))
     legend(d, COLS[1], y_cap + 66, SEG)
     legend(d, COLS[2], y_cap + 66, [v for v in DECISION.values()])
 
@@ -253,7 +296,8 @@ def main():
     y0 = y_cap + 126
     box = [MARGIN, y0, W - MARGIN, y0 + 206]
     dashed_rect(d, box)
-    d.text((MARGIN + 20, y0 + 16), 'Lời giải thích theo quy tắc ngưỡng. Ví dụ trên ô ảnh này:',
+    d.text((MARGIN + 20, y0 + 16), T('Lời giải thích theo quy tắc ngưỡng. Ví dụ trên ô ảnh này:',
+                                     'Explanation by the threshold rule. Examples on this tile:'),
            font=font(22, True), fill=DARK)
     examples = [cells[cells['decision'] == SPRAY].nlargest(1, 's'), cells[cells['decision'] == DEFER].head(1),
                 cells[cells['decision'] == NO_SPRAY].nsmallest(1, 's')]
@@ -265,17 +309,25 @@ def main():
         d.rectangle([MARGIN + 22, y + 3, MARGIN + 42, y + 23], fill=DECISION[c['decision']][1], outline='black')
         d.text((MARGIN + 54, y), explanation(c), font=font(20), fill=DARK)
         y += 34
-    d.text((MARGIN + 22, y + 6), 'Mỗi ô PHUN và CHƯA CHẮC còn có giải thích "bỏ những vùng cỏ nào thì quyết định đổi", '
-                                 'đã kiểm chứng bằng mô hình (hình giải thích phản thực).', font=font(20), fill=GREY)
+    d.text((MARGIN + 22, y + 6), T('Mỗi ô PHUN và CHƯA CHẮC còn có giải thích "bỏ những vùng cỏ nào thì quyết định '
+                                   'đổi", đã kiểm chứng bằng mô hình (hình giải thích phản thực).',
+                                   'Every SPRAY and DEFER cell also has a counterfactual explanation ("which weed patches, '
+                                   'if removed, change the decision"), checked by the model.'), font=font(20), fill=GREY)
 
     f_note = font(17)
     y = box[3] + 16
-    d.text((MARGIN, y), f'Minh họa trên ô ảnh {args.tile} (tập test, bay ngày {date_vi(args.tile)}) với '
-                        f'{model_label(run)}, mIoU test {num(miou)}%. Ngưỡng conformal hiệu chỉnh trên các vị trí test '
-                        f'khác, α = {g(ALPHA)}, β = {g(BETA)}.', font=f_note, fill=GREY)
-    d.text((MARGIN, y + 24), f'Ô cần phun nếu cỏ dại chiếm từ {g(100 * PRIMARY["tau"])}% diện tích ô (Longchamps và '
-                             'cộng sự, Weed Science 2014). Dữ liệu: WeedsGalore (Celikkan và cộng sự, WACV 2025), giấy '
-                             'phép CC BY 4.0.', font=f_note, fill=GREY)
+    d.text((MARGIN, y), T(f'Minh họa trên ô ảnh {args.tile} (tập test, bay ngày {date_vi(args.tile)}) với '
+                          f'{model_label(run)}, mIoU test {num(miou)}%. Ngưỡng conformal hiệu chỉnh trên các vị trí test '
+                          f'khác, α = {g(ALPHA)}, β = {g(BETA)}.',
+                          f'Test tile {args.tile} (flown on {date_en(args.tile)}) with {model_label(run)}, test mIoU '
+                          f'{num(miou)}%. Conformal thresholds calibrated on the other test locations, α = {g(ALPHA)}, '
+                          f'β = {g(BETA)}.'), font=f_note, fill=GREY)
+    d.text((MARGIN, y + 24), T(f'Ô cần phun nếu cỏ dại chiếm từ {g(100 * PRIMARY["tau"])}% diện tích ô (trong khoảng '
+                               '0,06–0,31% của Longchamps và cộng sự, 2014). Dữ liệu: WeedsGalore (Celikkan và cộng sự, '
+                               'WACV 2025), giấy phép CC BY 4.0.',
+                               f'A cell needs spraying if weed covers at least {g(100 * PRIMARY["tau"])}% of it (within '
+                               'the 0.06–0.31% range of Longchamps et al., 2014). Data: WeedsGalore (Celikkan et al., '
+                               'WACV 2025), CC BY 4.0.'), font=f_note, fill=GREY)
     out = Path(args.out)
     img.save(out)
     print(f'saved {out} ({out.stat().st_size / 1e6:.1f} MB); decisions on {args.tile}:',

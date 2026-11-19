@@ -20,6 +20,17 @@ HAVE_RESULTS = C.ZIP.exists() and C.MAIN_MODEL in C.available_models()
 needs_results = pytest.mark.skipif(not HAVE_RESULTS, reason='dataset zip or saved probability maps not found')
 
 
+def test_numbers_round_halves_up():
+    """Shares of 40 000 pixels whose percentage ends in 5 (0,145 %, 0,405 %, 0,075 %, 0,195 %) sit just below the half
+    as binary floats, and Python's own formatting rounded them down; the demo, like the figures, rounds halves up."""
+    import figures as F
+    import ui as U
+    assert (f'{100 * (58 / 40000):.2f}', f'{100 * (78 / 40000):.2f}', f'{2.25:.1f}') == ('0.14', '0.19', '2.2')
+    assert U.pct(58 / 40000, 2) == '0,15%' and U.pct(162 / 40000, 2) == '0,41%' and U.pct(78 / 40000, 2) == '0,20%'
+    assert F.pct(30 / 40000, 2) == '0,08%' and U.num(2.25, 1) == '2,3' and C.CF.cm2(2.25) == '2,3'
+    assert U.num(40000) == '40 000' and U.pct(0.1620370370370371) == '16,2%' and U.num(float('nan')) == '–'
+
+
 def tables(key, cell):
     ids = C.dataset_ids()
     out = {}

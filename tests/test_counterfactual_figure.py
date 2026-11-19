@@ -131,3 +131,11 @@ def test_patch_boxes_are_inside_the_cell():
     c = {'cell': 4, 'patches': f'{10 * 30 + 10} {19 * 30 + 19} {12 * 30 + 15}'}
     assert F.patch_boxes(c) == [(0, 0), (180, 180), (100, 40)]
     assert np.all(np.array(F.patch_boxes(c)) < F.CELL)
+
+
+def test_numbers_round_halves_up():
+    # 78 of 40 000 pixels is 0,195 %: as a float it sits below the half, and Python's own rounding gave 0,19 %
+    assert f'{100 * (78 / 40000):.2f}' == '0.19'
+    assert F.pct(78 / 40000) == '0,20' and F.pct(115 / 40000) == '0,29' and F.pct(0.1465) == '14,65'
+    # the cm2 of the curves (the demo draws them too): 2.25 cm2 is 36 pixels, which Python's own rounding gave as 2,2
+    assert f'{2.25:.1f}' == '2.2' and F.cm2(2.25) == '2,3' and F.cm2(4.375) == '4,4' and F.cm2(366.25) == '366'
